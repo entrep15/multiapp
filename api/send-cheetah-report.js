@@ -101,14 +101,29 @@ function buildReportHTML(todayStats, yesterdayStats) {
       const today = todayStats[operation][table] || {};
       const yesterday = yesterdayStats[operation][table] || {};
 
-      const firstImprovement = (today.firstAttemptPct || 0) - (yesterday.firstAttemptPct || 0);
-      const secondImprovement = (today.secondAttemptPct || 0) - (yesterday.secondAttemptPct || 0);
+      // Only calculate improvements when both days have data; otherwise show "New Table" or no comparison
+      const firstImprovement = (today.firstAttemptTotal > 0 && yesterday.firstAttemptTotal > 0)
+        ? (today.firstAttemptPct || 0) - (yesterday.firstAttemptPct || 0)
+        : (today.firstAttemptTotal === 0 && yesterday.firstAttemptTotal === 0 ? 0 : null);
+
+      const secondImprovement = (today.secondAttemptTotal > 0 && yesterday.secondAttemptTotal > 0)
+        ? (today.secondAttemptPct || 0) - (yesterday.secondAttemptPct || 0)
+        : (today.secondAttemptTotal === 0 && yesterday.secondAttemptTotal === 0 ? 0 : null);
+
       const resetImprovement = (today.resets || 0) - (yesterday.resets || 0);
 
       const getColor = (pct) => {
+        if (pct === null) return 'rgb(220, 220, 220)';
         if (pct > 0) return 'rgb(134, 239, 52)';
         if (pct < 0) return 'rgb(253, 165, 151)';
         return 'rgb(187, 247, 208)';
+      };
+
+      const formatImprovement = (value) => {
+        if (value === null) return '✨ New Table';
+        if (value > 0) return '↑ +' + Math.abs(value).toFixed(1) + '%';
+        if (value < 0) return '↓ ' + Math.abs(value).toFixed(1) + '%';
+        return '→ ' + Math.abs(value).toFixed(1) + '%';
       };
 
       const getResetColor = (delta) => {
@@ -122,10 +137,10 @@ function buildReportHTML(todayStats, yesterdayStats) {
           <td class="col-table">${table}</td>
           <td>${today.firstAttemptTotal > 0 ? today.firstAttemptCorrect + ' / ' + today.firstAttemptTotal : '— / —'}</td>
           <td>${today.firstAttemptPct > 0 ? today.firstAttemptPct + '%' : '—'}</td>
-          <td class="heatmap-improvement" style="background-color: ${getColor(firstImprovement)};">${firstImprovement > 0 ? '↑ +' : firstImprovement < 0 ? '↓ ' : '→ '}${Math.abs(firstImprovement).toFixed(1)}%</td>
+          <td class="heatmap-improvement" style="background-color: ${getColor(firstImprovement)};">${formatImprovement(firstImprovement)}</td>
           <td>${today.secondAttemptTotal > 0 ? today.secondAttemptCorrect + ' / ' + today.secondAttemptTotal : '— / —'}</td>
           <td>${today.secondAttemptPct > 0 ? today.secondAttemptPct + '%' : '—'}</td>
-          <td class="heatmap-improvement" style="background-color: ${getColor(secondImprovement)};">${secondImprovement > 0 ? '↑ +' : secondImprovement < 0 ? '↓ ' : '→ '}${Math.abs(secondImprovement).toFixed(1)}%</td>
+          <td class="heatmap-improvement" style="background-color: ${getColor(secondImprovement)};">${formatImprovement(secondImprovement)}</td>
           <td>${today.resets || 0}</td>
           <td class="heatmap-reset-improvement" style="background-color: ${getResetColor(resetImprovement)};">${resetImprovement > 0 ? '↑ ' + resetImprovement + ' more' : resetImprovement < 0 ? '↓ ' + Math.abs(resetImprovement) + ' fewer' : '→ Same'}</td>
         </tr>
