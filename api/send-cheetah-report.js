@@ -56,20 +56,12 @@ function getMidnightPT(date) {
 
 // Calculate day-over-day stats for a table
 function getTableStats(events, op, table, mode) {
-  const correctCount = events.filter(e =>
-    e.type === 'correct' && e.op === op && e.table === table && e.mode === mode
-  ).length;
-
-  const totalAttempts = events.filter(e =>
-    (e.type === 'correct' || e.type === 'wrong' || e.type === 'timeout') &&
-    e.op === op && e.table === table && e.mode === mode
-  ).length;
-
   const firstAttemptCorrect = events.filter(e =>
     e.type === 'correct' && e.op === op && e.table === table && e.mode === mode && e.firstAttempt
   ).length;
 
   const totalFirstAttempts = events.filter(e =>
+    (e.type === 'correct' || e.type === 'wrong' || e.type === 'timeout') &&
     e.op === op && e.table === table && e.mode === mode && e.firstAttempt
   ).length;
 
@@ -78,6 +70,7 @@ function getTableStats(events, op, table, mode) {
   ).length;
 
   const totalSecondAttempts = events.filter(e =>
+    (e.type === 'correct' || e.type === 'wrong' || e.type === 'timeout') &&
     e.op === op && e.table === table && e.mode === mode && !e.firstAttempt
   ).length;
 
