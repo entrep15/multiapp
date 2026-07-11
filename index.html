@@ -1,0 +1,2139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Multiplication Practice</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 32px 40px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    text-align: center;
+  }
+  .op-toggle {
+    display: flex;
+    gap: 6px;
+    background: #f1edf6;
+    padding: 4px;
+    border-radius: 999px;
+    margin-bottom: 20px;
+  }
+  .op-btn {
+    flex: 1;
+    background: transparent;
+    color: #6a4f8c;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, transform 0.1s;
+    margin: 0;
+    display: block;
+  }
+  .op-btn:hover { background: rgba(118, 75, 162, 0.08); }
+  .op-btn.active {
+    background: #764ba2;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(118, 75, 162, 0.3);
+  }
+  .picker-group {
+    display: flex;
+    gap: 4px;
+    background: #f1edf6;
+    padding: 4px;
+    border-radius: 999px;
+    margin-bottom: 10px;
+  }
+  .picker-btn {
+    flex: 1;
+    background: transparent;
+    color: #6a4f8c;
+    border: none;
+    padding: 8px 4px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, transform 0.1s;
+    margin: 0;
+    display: block;
+    white-space: nowrap;
+  }
+  .picker-btn:hover { background: rgba(118, 75, 162, 0.08); }
+  .picker-btn:active { transform: scale(0.96); }
+  .picker-btn.active {
+    background: #764ba2;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(118, 75, 162, 0.3);
+  }
+  .picker-btn.dog.active {
+    background: linear-gradient(90deg, #ff9a3d, #ff4d4d);
+    box-shadow: 0 2px 6px rgba(230, 74, 25, 0.4);
+  }
+  .picker-btn.cheetah.active {
+    background: linear-gradient(90deg, #ff4d4d, #b71c1c);
+    box-shadow: 0 2px 8px rgba(183, 28, 28, 0.5);
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #eee;
+  }
+  h1 {
+    margin: 0;
+    font-size: 20px;
+    color: #555;
+  }
+  .points {
+    font-size: 18px;
+    font-weight: 700;
+    color: #764ba2;
+    background: #f3f0fa;
+    padding: 8px 14px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .points-caption {
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+    margin: -16px 0 16px;
+    line-height: 1.4;
+    letter-spacing: 0.2px;
+  }
+  .settings-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    color: #764ba2;
+    transition: opacity 0.2s;
+  }
+  .settings-btn:hover { opacity: 0.7; }
+  .settings-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+  }
+  .settings-overlay.hidden { display: none; }
+  .settings-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 32px;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .settings-header {
+    font-size: 22px;
+    font-weight: 700;
+    color: #764ba2;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .settings-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+  }
+  .settings-section {
+    margin-bottom: 28px;
+  }
+  .settings-section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #555;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .mode-checkbox {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    cursor: pointer;
+  }
+  .mode-checkbox input {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    margin-right: 10px;
+  }
+  .mode-checkbox label {
+    cursor: pointer;
+    font-size: 14px;
+    color: #555;
+  }
+  .settings-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+  }
+  .settings-actions button {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .settings-save {
+    background: #764ba2;
+    color: #fff;
+  }
+  .settings-save:hover { background: #6a3f95; }
+  .settings-cancel {
+    background: #f1edf6;
+    color: #764ba2;
+  }
+  .settings-cancel:hover { background: #e8e1f0; }
+  .progress {
+    margin-bottom: 14px;
+  }
+  .progress-label {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
+  }
+  .progress-bar {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+  }
+  .progress-cell {
+    flex: 1;
+    max-width: 32px;
+    height: 16px;
+    background: #ece8f3;
+    border-radius: 4px;
+    transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+  }
+  .progress-cell.filled {
+    background: linear-gradient(135deg, #8a5cd6, #5d3a82);
+    box-shadow: 0 2px 6px rgba(118, 75, 162, 0.35);
+    transform: scaleY(1.15);
+  }
+  body.dog .progress-cell.filled {
+    background: linear-gradient(135deg, #ff9a3d, #e64a19);
+    box-shadow: 0 2px 6px rgba(230, 74, 25, 0.4);
+  }
+  body.cheetah .progress-cell.filled {
+    background: linear-gradient(135deg, #ff4d4d, #b71c1c);
+    box-shadow: 0 2px 8px rgba(183, 28, 28, 0.5);
+  }
+  .mode-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #fff;
+  }
+  .mode-label.snail   { background: #764ba2; }
+  .mode-label.dog     { background: linear-gradient(90deg, #ff9a3d, #ff4d4d); }
+  .mode-label.cheetah { background: linear-gradient(90deg, #ff4d4d, #b71c1c); }
+  .timer {
+    height: 8px;
+    background: #f1edf6;
+    border-radius: 4px;
+    margin: 0 0 16px;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .timer.active { opacity: 1; }
+  .timer-bar {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #4caf50, #ff9a3d 60%, #e64a19);
+    border-radius: 4px;
+    transform-origin: left center;
+  }
+  .problem {
+    font-size: 64px;
+    font-weight: 700;
+    color: #333;
+    margin: 20px 0;
+    letter-spacing: 2px;
+  }
+  .character {
+    margin: 8px auto 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .character svg,
+  .character img {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 50%;
+    background: #f5f3fa;
+    border: 4px solid #fff;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.2);
+    animation: pop 0.4s ease-out;
+  }
+  .character-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #764ba2;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  @keyframes pop {
+    0%   { transform: scale(0.6); opacity: 0; }
+    60%  { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+
+  /* Login overlay */
+  .login-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+  }
+  .login-overlay.hidden { display: none; }
+  .login-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 36px 32px;
+    text-align: center;
+    width: 100%;
+    max-width: 340px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  }
+  .login-emoji { font-size: 48px; margin-bottom: 4px; line-height: 1; }
+  .login-card h2 { margin: 8px 0 6px; color: #333; font-size: 24px; }
+  .login-card p { margin: 0 0 18px; color: #888; font-size: 14px; }
+  .login-card input {
+    font-size: 28px;
+    padding: 12px 16px;
+    width: 180px;
+    text-align: center;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+    outline: none;
+    letter-spacing: 12px;
+    font-weight: 700;
+    transition: border-color 0.2s;
+  }
+  .login-card input:focus { border-color: #764ba2; }
+  .login-card button {
+    display: block;
+    margin: 20px auto 0;
+    font-size: 18px;
+    font-weight: 700;
+    padding: 12px 32px;
+    background: #764ba2;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .login-card button:hover { background: #5d3a82; }
+  .login-card button:active { transform: scale(0.97); }
+  .login-error {
+    margin-top: 12px;
+    color: #c0392b;
+    font-size: 13px;
+    min-height: 18px;
+    font-weight: 600;
+  }
+
+  /* Confetti / fireworks overlay */
+  .confetti-layer {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 9999;
+  }
+  .confetti-piece {
+    position: fixed;
+    will-change: transform, opacity;
+    animation: confetti-fall var(--dur, 1.4s) cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  }
+  @keyframes confetti-fall {
+    0%   { transform: translate(0, 0) rotate(0deg);                                   opacity: 1; }
+    70%  {                                                                            opacity: 1; }
+    100% { transform: translate(var(--dx, 0px), var(--dy, 300px)) rotate(var(--rot, 720deg)); opacity: 0; }
+  }
+  input[type="number"] {
+    font-size: 32px;
+    padding: 12px 16px;
+    width: 160px;
+    text-align: center;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s;
+    -moz-appearance: textfield;
+  }
+  input[type="number"]:focus {
+    border-color: #764ba2;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  button {
+    display: block;
+    margin: 20px auto 0;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 12px 32px;
+    background: #764ba2;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  button:hover { background: #5d3a82; }
+  button:active { transform: scale(0.97); }
+  button:disabled { background: #aaa; cursor: not-allowed; }
+  .feedback {
+    margin-top: 20px;
+    min-height: 28px;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .feedback.right { color: #2e8b57; }
+  .feedback.wrong { color: #c0392b; }
+  .praise {
+    margin-top: 8px;
+    min-height: 24px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #764ba2;
+  }
+  .attempts {
+    font-size: 13px;
+    color: #888;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="op-toggle" id="op-toggle">
+      <button type="button" class="op-btn active" data-op="multiplication">× Multiplication</button>
+      <button type="button" class="op-btn" data-op="division">÷ Division</button>
+    </div>
+    <div class="picker-group" id="table-picker" aria-label="Pick a table">
+      <button type="button" class="picker-btn" data-table="2">2</button>
+      <button type="button" class="picker-btn" data-table="3">3</button>
+      <button type="button" class="picker-btn" data-table="4">4</button>
+      <button type="button" class="picker-btn" data-table="5">5</button>
+      <button type="button" class="picker-btn" data-table="6">6</button>
+      <button type="button" class="picker-btn" data-table="7">7</button>
+      <button type="button" class="picker-btn" data-table="8">8</button>
+      <button type="button" class="picker-btn" data-table="9">9</button>
+      <button type="button" class="picker-btn" data-table="10">10</button>
+    </div>
+    <div class="picker-group" id="mode-picker" aria-label="Pick a pace">
+      <button type="button" class="picker-btn snail"   data-mode="snail">🐌 Snail</button>
+      <button type="button" class="picker-btn dog"     data-mode="dog">🐕 Dog (15s)</button>
+      <button type="button" class="picker-btn cheetah" data-mode="cheetah">🐆 Cheetah (7s)</button>
+    </div>
+    <div class="header">
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <button class="settings-btn" id="settings-btn" title="Settings">⚙️</button>
+        <h1 id="title">Multiplication Practice</h1>
+      </div>
+      <div class="points">🎮 <span id="points">0</span> / 1000</div>
+    </div>
+    <div class="points-caption">
+      Cheetah Mode only · 10 🎮 per correct · 100 per table · Table 1 is free · <b>1,000 = all 10 tables mastered</b>
+    </div>
+    <div class="progress">
+      <div class="progress-label">
+        Table <span id="table-num">2</span> ·
+        <span id="mode-label" class="mode-label classic">Classic Mode</span>
+      </div>
+      <div class="progress-bar" id="progress-bar">
+        <div class="progress-cell"></div>
+        <div class="progress-cell"></div>
+        <div class="progress-cell"></div>
+        <div class="progress-cell"></div>
+        <div class="progress-cell"></div>
+        <div class="progress-cell"></div>
+        <div class="progress-cell"></div>
+        <div class="progress-cell"></div>
+        <div class="progress-cell"></div>
+        <div class="progress-cell"></div>
+      </div>
+    </div>
+    <div class="character" id="character"></div>
+    <div class="problem" id="problem">— × —</div>
+    <div class="timer" id="timer"><div class="timer-bar" id="timer-bar"></div></div>
+    <input type="number" id="answer" autocomplete="off" />
+    <div class="attempts" id="attempts"></div>
+    <button id="submit">Submit</button>
+    <div class="feedback" id="feedback"></div>
+    <div class="praise" id="praise"></div>
+  </div>
+  <div id="confetti-layer" class="confetti-layer"></div>
+
+  <div class="login-overlay hidden" id="login-overlay" role="dialog" aria-modal="true">
+    <div class="login-card">
+      <div class="login-emoji">🎮</div>
+      <h2 id="login-greeting">Hi Drohn!</h2>
+      <p>Type your secret code to start.</p>
+      <input
+        type="password"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        id="login-pin"
+        maxlength="6"
+        placeholder="••••"
+        autocomplete="off"
+      />
+      <button type="button" id="login-btn">Let's Play!</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="settings-overlay hidden" id="settings-overlay">
+    <div class="settings-card">
+      <div class="settings-header">
+        Settings
+        <button class="settings-close" id="settings-close">✕</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Multiplication Modes</div>
+        <div class="mode-checkbox">
+          <input type="checkbox" id="mult-snail" checked>
+          <label for="mult-snail">🐌 Snail (No timer)</label>
+        </div>
+        <div class="mode-checkbox">
+          <input type="checkbox" id="mult-dog" checked>
+          <label for="mult-dog">🐕 Dog (15 seconds)</label>
+        </div>
+        <div class="mode-checkbox">
+          <input type="checkbox" id="mult-cheetah" checked>
+          <label for="mult-cheetah">🐆 Cheetah (7 seconds)</label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Division Modes</div>
+        <div class="mode-checkbox">
+          <input type="checkbox" id="div-snail" checked>
+          <label for="div-snail">🐌 Snail (No timer)</label>
+        </div>
+        <div class="mode-checkbox">
+          <input type="checkbox" id="div-dog" checked>
+          <label for="div-dog">🐕 Dog (15 seconds)</label>
+        </div>
+        <div class="mode-checkbox">
+          <input type="checkbox" id="div-cheetah" checked>
+          <label for="div-cheetah">🐆 Cheetah (7 seconds)</label>
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button type="button" class="settings-cancel" id="settings-cancel">Cancel</button>
+        <button type="button" class="settings-save" id="settings-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const problemEl   = document.getElementById('problem');
+  const answerEl    = document.getElementById('answer');
+  const submitBtn   = document.getElementById('submit');
+  const feedbackEl  = document.getElementById('feedback');
+  const praiseEl    = document.getElementById('praise');
+  const pointsEl    = document.getElementById('points');
+  const progressBarEl = document.getElementById('progress-bar');
+  const attemptsEl  = document.getElementById('attempts');
+  const characterEl   = document.getElementById('character');
+  const tableNumEl    = document.getElementById('table-num');
+  const modeLabelEl   = document.getElementById('mode-label');
+  const timerEl       = document.getElementById('timer');
+  const timerBarEl    = document.getElementById('timer-bar');
+
+  const MODE_SECONDS = { snail: 0, dog: 15, cheetah: 7 };
+  const MODE_ORDER = ['snail', 'dog', 'cheetah'];
+  const MODE_LABEL = {
+    snail:   'Snail Mode 🐌',
+    dog:     'Dog Mode 🐕 (15s)',
+    cheetah: 'Cheetah Mode 🐆 (7s)'
+  };
+  const MODE_SPOKEN = {
+    snail:   'snail mode',
+    dog:     'dog mode',
+    cheetah: 'cheetah mode'
+  };
+  // Migration map from old mode names so existing saved progress doesn't get wiped
+  const MODE_MIGRATE = { classic: 'snail', sonic: 'dog', supersonic: 'cheetah' };
+
+  const opToggleEl    = document.getElementById('op-toggle');
+  const titleEl       = document.getElementById('title');
+  const tablePickerEl = document.getElementById('table-picker');
+  const modePickerEl  = document.getElementById('mode-picker');
+
+  let a = 0, b = 0;
+  let correctAnswer = 0;
+  let points = 0;
+  let currentTable = 2;            // starts at the 2 table
+  let currentMode = 'snail';       // 'snail' | 'dog' | 'cheetah'
+  let tableStreak = 0;             // consecutive correct within the current stage
+  let praiseShownAt = new Set();   // milestones already praised within the current stage streak
+  let charIndex = 0;
+  let bag = [];                    // shuffled queue of factors for current table
+  let timerId = null;              // active sonic timer (setTimeout handle)
+  let timerStartMs = 0;            // absolute wall-clock time when the CURRENT chance started
+  let timerDurationMs = 0;         // duration for this chance (MODE_SECONDS * 1000)
+  let pendingTimerStartMs = null;  // when restoring a sticky problem, wall-clock start of the paused chance
+  let cheetahFailures = 0;         // failed cheetah questions (2 chances used) this attempt
+  let inSecondChance = false;      // per-question: true when on the cheetah second attempt
+  let cheetahRunEarned = 0;        // uncommitted Robucks awarded in the current cheetah run
+                                   // (rolled back on any exit before 10/10 completion — closes several exploits)
+  let operation = 'multiplication';// 'multiplication' | 'division'
+  let tablePoints = {};            // { tableNum: pointsEarnedOnThatTable } — for demotion refund
+
+  // ----- Persistence (localStorage) -----
+  const STORAGE_KEY = 'mp.v3';
+
+  function defaultOpState() {
+    return {
+      points: 0,
+      currentTable: 2,
+      currentMode: 'snail',
+      tableStreak: 0,
+      cheetahFailures: 0,
+      praiseShownAt: [],
+      tablePoints: {},        // { tableNumber: pointsEarnedOnThatTable }
+      bag: [],                // upcoming factors queue (persisted so switch-tab doesn't reshuffle)
+      currentProblem: null,   // { a, b, correctAnswer, inSecondChance } — sticky across tab switches
+      inSecondChance: false,
+      cheetahRunEarned: 0,    // uncommitted cheetah-run Robucks (only committed on 10/10 completion)
+      frozenModeStates: {},   // { [table]: { [mode]: { streak, bag, problem+timer, ... } } }
+      lastModePerTable: {}    // { [table]: 'snail'|'dog'|'cheetah' } — sticky mode per table
+    };
+  }
+
+  // Combined storage holds state for BOTH operations + the currently active one
+  const combined = {
+    op: 'multiplication',
+    multiplication: defaultOpState(),
+    division: defaultOpState()
+  };
+
+  function sanitizeGameState(s) {
+    const out = defaultOpState();
+    if (!s || typeof s !== 'object') return out;
+    if (typeof s.points === 'number') out.points = s.points;
+    if (typeof s.currentTable === 'number' && s.currentTable >= 2 && s.currentTable <= 10) {
+      out.currentTable = s.currentTable;
+    }
+    const migratedMode = MODE_MIGRATE[s.currentMode] || s.currentMode;
+    if (MODE_ORDER.indexOf(migratedMode) !== -1) out.currentMode = migratedMode;
+    if (typeof s.tableStreak === 'number') out.tableStreak = s.tableStreak;
+    if (typeof s.cheetahFailures === 'number') out.cheetahFailures = s.cheetahFailures;
+    if (Array.isArray(s.praiseShownAt)) out.praiseShownAt = s.praiseShownAt;
+    if (s.tablePoints && typeof s.tablePoints === 'object') {
+      const tp = {};
+      for (const k in s.tablePoints) {
+        if (typeof s.tablePoints[k] === 'number') tp[k] = s.tablePoints[k];
+      }
+      out.tablePoints = tp;
+    }
+    if (Array.isArray(s.bag)) {
+      out.bag = s.bag.filter(function (x) { return typeof x === 'number' && x >= 1 && x <= 10; });
+    }
+    if (s.currentProblem && typeof s.currentProblem === 'object') {
+      const p = s.currentProblem;
+      if (typeof p.a === 'number' && typeof p.b === 'number' && typeof p.correctAnswer === 'number') {
+        out.currentProblem = { a: p.a, b: p.b, correctAnswer: p.correctAnswer, inSecondChance: !!p.inSecondChance };
+        if (typeof p.timerStartMs === 'number' && p.timerStartMs > 0) {
+          out.currentProblem.timerStartMs = p.timerStartMs;
+        }
+        if (typeof p.timerDurationMs === 'number' && p.timerDurationMs > 0) {
+          out.currentProblem.timerDurationMs = p.timerDurationMs;
+        }
+      }
+    }
+    if (s.frozenModeStates && typeof s.frozenModeStates === 'object') {
+      out.frozenModeStates = s.frozenModeStates;
+    } else if (s.frozenCheetahRuns && typeof s.frozenCheetahRuns === 'object') {
+      // Migrate old shape { [table]: cheetahRunObj } → { [table]: { cheetah: cheetahRunObj } }
+      const migrated = {};
+      for (const t in s.frozenCheetahRuns) {
+        migrated[t] = { cheetah: s.frozenCheetahRuns[t] };
+      }
+      out.frozenModeStates = migrated;
+    }
+    if (s.lastModePerTable && typeof s.lastModePerTable === 'object') {
+      const lm = {};
+      for (const k in s.lastModePerTable) {
+        if (MODE_ORDER.indexOf(s.lastModePerTable[k]) !== -1) lm[k] = s.lastModePerTable[k];
+      }
+      out.lastModePerTable = lm;
+    }
+    if (typeof s.inSecondChance === 'boolean') out.inSecondChance = s.inSecondChance;
+    if (typeof s.cheetahRunEarned === 'number' && s.cheetahRunEarned >= 0) {
+      out.cheetahRunEarned = s.cheetahRunEarned;
+    }
+    return out;
+  }
+
+  function captureLive() {
+    // Snapshot the WALL-CLOCK start of the current chance so tab-switching
+    // can't reset or pause the timer. When restored, elapsed is computed
+    // against the original start time.
+    const cp = (a > 0 && b > 0)
+      ? { a: a, b: b, correctAnswer: correctAnswer, inSecondChance: inSecondChance }
+      : null;
+    if (cp && timerStartMs > 0 && timerDurationMs > 0 && MODE_SECONDS[currentMode] > 0) {
+      cp.timerStartMs = timerStartMs;
+      cp.timerDurationMs = timerDurationMs;
+    }
+    return {
+      points: points,
+      currentTable: currentTable,
+      currentMode: currentMode,
+      tableStreak: tableStreak,
+      cheetahFailures: cheetahFailures,
+      praiseShownAt: Array.from(praiseShownAt),
+      tablePoints: tablePoints,
+      bag: bag.slice(),
+      currentProblem: cp,
+      inSecondChance: inSecondChance,
+      cheetahRunEarned: cheetahRunEarned,
+      frozenModeStates: (combined[operation] && combined[operation].frozenModeStates)
+        ? combined[operation].frozenModeStates
+        : {},
+      lastModePerTable: (combined[operation] && combined[operation].lastModePerTable)
+        ? combined[operation].lastModePerTable
+        : {}
+    };
+  }
+
+  function applyLive(s) {
+    points          = s.points;
+    currentTable    = s.currentTable;
+    currentMode     = s.currentMode;
+    tableStreak     = s.tableStreak;
+    cheetahFailures = s.cheetahFailures;
+    praiseShownAt   = new Set(s.praiseShownAt || []);
+    tablePoints     = (s.tablePoints && typeof s.tablePoints === 'object') ? Object.assign({}, s.tablePoints) : {};
+    bag             = Array.isArray(s.bag) ? s.bag.slice() : [];
+    // Table 1 freebie: 100 Robucks credited automatically (the kid never sees
+    // a Table 1 question because the game starts at Table 2). Idempotent.
+    if (!tablePoints[1]) {
+      tablePoints[1] = 100;
+      points += 100;
+    }
+    if (s.currentProblem) {
+      a = s.currentProblem.a;
+      b = s.currentProblem.b;
+      correctAnswer = s.currentProblem.correctAnswer;
+      inSecondChance = !!s.currentProblem.inSecondChance;
+      pendingTimerStartMs = (typeof s.currentProblem.timerStartMs === 'number' && s.currentProblem.timerStartMs > 0)
+        ? s.currentProblem.timerStartMs
+        : null;
+    } else {
+      a = 0; b = 0; correctAnswer = 0;
+      inSecondChance = !!s.inSecondChance;
+      pendingTimerStartMs = null;
+    }
+    cheetahRunEarned = (typeof s.cheetahRunEarned === 'number') ? s.cheetahRunEarned : 0;
+    // Per-op maps live on the op state object itself so freeze/restore/lookup
+    // hits the correct instance.
+    if (combined[operation]) {
+      combined[operation].frozenModeStates = (s.frozenModeStates && typeof s.frozenModeStates === 'object')
+        ? s.frozenModeStates
+        : {};
+      combined[operation].lastModePerTable = (s.lastModePerTable && typeof s.lastModePerTable === 'object')
+        ? s.lastModePerTable
+        : {};
+    }
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.op === 'multiplication' || parsed.op === 'division') {
+            combined.op = parsed.op;
+          }
+          if (parsed.multiplication) combined.multiplication = sanitizeGameState(parsed.multiplication);
+          if (parsed.division)       combined.division       = sanitizeGameState(parsed.division);
+        }
+      } else {
+        // First time on v3 — migrate from older single-game v2 key if present
+        const oldRaw = localStorage.getItem('multiplicationPractice.v2');
+        if (oldRaw) {
+          try { combined.multiplication = sanitizeGameState(JSON.parse(oldRaw)); } catch (e) {}
+        }
+      }
+    } catch (e) { /* ignore corrupt state */ }
+    // Clean up obsolete keys
+    try { localStorage.removeItem('multiplicationPractice.v1'); } catch (e) {}
+    try { localStorage.removeItem('multiplicationPractice.v2'); } catch (e) {}
+  }
+
+  function saveState() {
+    combined[operation] = captureLive();
+    combined.op = operation;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
+    } catch (e) { /* ignore quota / disabled storage */ }
+  }
+
+  // Returning-visitor check via cookie. Any browser that has visited before
+  // and has no saved progress starts at Table 4 Snail Mode instead of Table 2.
+  const VISITED_COOKIE = 'mp_visited';
+  const wasReturningVisitor = document.cookie
+    .split('; ').some(c => c.indexOf(VISITED_COOKIE + '=') === 0);
+  try {
+    document.cookie = VISITED_COOKIE + '=1; max-age=31536000; path=/; SameSite=Lax';
+  } catch (e) { /* ignore */ }
+  const hadAnyState = !!(localStorage.getItem(STORAGE_KEY) || localStorage.getItem('multiplicationPractice.v2'));
+
+  loadState();
+
+  // Returning visitor with no saved progress on either op → bump default to Table 4
+  if (wasReturningVisitor && !hadAnyState) {
+    combined.multiplication.currentTable = 4;
+    combined.division.currentTable = 4;
+  }
+
+  // BEFORE ANYTHING ELSE: Set up login and show PIN overlay
+  // This ensures the game is not playable until PIN is entered
+  let userPin = '';
+
+  function showLoginOverlay() {
+    const overlay = document.getElementById('login-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+    const pinInput = document.getElementById('login-pin');
+    if (pinInput) {
+      pinInput.value = '';
+      setTimeout(() => { try { pinInput.focus(); } catch (e) {} }, 60);
+    }
+  }
+
+  // Show login immediately when page loads
+  showLoginOverlay();
+
+  // Now load and prepare game state (but don't show it yet)
+  operation = combined.op;
+  applyLive(combined[operation]);
+
+  // Daily reset at 11:59 PM PT (6:59 AM UTC next day)
+  // Check if we've crossed into a new day and reset points to 100 if so.
+  const DAILY_RESET_KEY = 'mp_daily_reset_pt';
+  function getPTDate() {
+    const now = new Date();
+    const ptTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    return ptTime.toDateString(); // e.g., "Fri Jul 04 2026"
+  }
+  function checkAndApplyDailyReset() {
+    const today = getPTDate();
+    let lastResetDate = '';
+    try { lastResetDate = localStorage.getItem(DAILY_RESET_KEY) || ''; } catch (e) {}
+
+    if (lastResetDate !== today) {
+      // New day in PT timezone — reset points back to 100 and tablePoints to empty
+      points = 100;
+      tablePoints = {};
+      pointsEl.textContent = points;
+      currentTable = 2; // Always start at Table 2 after reset
+      currentMode = 'snail'; // Start with Snail mode
+      try { localStorage.setItem(DAILY_RESET_KEY, today); } catch (e) {}
+      // Post event for daily reset
+      if (typeof postEvent === 'function') postEvent({ type: 'daily-reset', points: points });
+    }
+  }
+  checkAndApplyDailyReset();
+
+  // Check for daily reset every minute (so resets happen within ~1 min if kid is playing past midnight)
+  setInterval(checkAndApplyDailyReset, 60000);
+
+  // ----- Characters -----
+  const SVG_MANDO = `
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="beskar" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#cfd2d8"/>
+          <stop offset="100%" stop-color="#7d8189"/>
+        </linearGradient>
+      </defs>
+      <path d="M100 18 C58 22 46 60 46 100 C46 140 60 168 76 178 L124 178 C140 168 154 140 154 100 C154 60 142 22 100 18 Z"
+            fill="url(#beskar)" stroke="#3a3d44" stroke-width="2"/>
+      <path d="M62 76 L138 76 L138 96 L112 96 L112 150 L88 150 L88 96 L62 96 Z" fill="#0d0d11"/>
+      <ellipse cx="78" cy="55" rx="9" ry="22" fill="#ffffff" opacity="0.35"/>
+      <rect x="74" y="172" width="52" height="10" fill="#5a5d65" rx="2"/>
+    </svg>`;
+
+  const SVG_GROGU = `
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <path d="M40 170 Q40 130 100 130 Q160 130 160 170 L160 198 L40 198 Z" fill="#c9a877" stroke="#7a6438" stroke-width="2"/>
+      <ellipse cx="35" cy="115" rx="22" ry="38" fill="#a3c182" stroke="#6b8a4e" stroke-width="2" transform="rotate(-28 35 115)"/>
+      <ellipse cx="165" cy="115" rx="22" ry="38" fill="#a3c182" stroke="#6b8a4e" stroke-width="2" transform="rotate(28 165 115)"/>
+      <ellipse cx="35" cy="115" rx="10" ry="24" fill="#7c9a5c" transform="rotate(-28 35 115)"/>
+      <ellipse cx="165" cy="115" rx="10" ry="24" fill="#7c9a5c" transform="rotate(28 165 115)"/>
+      <ellipse cx="100" cy="100" rx="52" ry="56" fill="#a3c182" stroke="#6b8a4e" stroke-width="2"/>
+      <ellipse cx="78" cy="98" rx="13" ry="15" fill="#000"/>
+      <ellipse cx="122" cy="98" rx="13" ry="15" fill="#000"/>
+      <ellipse cx="82" cy="93" rx="3.5" ry="3.5" fill="#fff"/>
+      <ellipse cx="126" cy="93" rx="3.5" ry="3.5" fill="#fff"/>
+      <path d="M88 128 Q100 134 112 128" stroke="#3a2a1a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    </svg>`;
+
+  const SVG_RADA = `
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="100" cy="150" rx="88" ry="48" fill="#a98e5a" stroke="#5e4a26" stroke-width="2"/>
+      <ellipse cx="100" cy="158" rx="68" ry="32" fill="#d4b888"/>
+      <ellipse cx="100" cy="82" rx="62" ry="48" fill="#b89762" stroke="#5e4a26" stroke-width="2"/>
+      <ellipse cx="80" cy="68" rx="9" ry="7" fill="#fff"/>
+      <ellipse cx="120" cy="68" rx="9" ry="7" fill="#fff"/>
+      <circle cx="80" cy="69" r="3.5" fill="#2a1a05"/>
+      <circle cx="120" cy="69" r="3.5" fill="#2a1a05"/>
+      <path d="M55 100 Q100 130 145 100 Q100 118 55 100 Z" fill="#4a3318"/>
+      <path d="M68 108 Q100 122 132 108" stroke="#2a1a05" stroke-width="2.5" fill="none"/>
+      <ellipse cx="22" cy="145" rx="18" ry="11" fill="#a98e5a" stroke="#5e4a26" stroke-width="2"/>
+      <ellipse cx="178" cy="145" rx="18" ry="11" fill="#a98e5a" stroke="#5e4a26" stroke-width="2"/>
+      <ellipse cx="70" cy="60" rx="6" ry="3" fill="#8c7042" opacity="0.6"/>
+      <ellipse cx="130" cy="60" rx="6" ry="3" fill="#8c7042" opacity="0.6"/>
+    </svg>`;
+
+  const characters = [
+    {
+      id: 'mando',
+      name: 'The Mandalorian',
+      img: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a1/TheMandalorian.jpg/250px-TheMandalorian.jpg',
+      svg: SVG_MANDO,
+      voice: { pitch: 0.5, rate: 0.9, prefer: ['Daniel','Alex','Fred','Aaron','Tom'] },
+      sayProblem: (a, b) => `This is the way. What is ${a} times ${b}?`
+    },
+    {
+      id: 'grogu',
+      name: 'Grogu',
+      img: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/a0/Grogu_%28Star_Wars%29.jpg/250px-Grogu_%28Star_Wars%29.jpg',
+      svg: SVG_GROGU,
+      voice: { pitch: 1.9, rate: 1.05, prefer: ['Samantha','Karen','Susan','Victoria'] },
+      sayProblem: (a, b) => `Patu! ${a} times ${b}?`
+    },
+    {
+      id: 'rada',
+      name: 'Rada the Hutt',
+      img: 'https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Jabba_the_Hutt_in_Return_of_the_Jedi_%281983%29.png/250px-Jabba_the_Hutt_in_Return_of_the_Jedi_%281983%29.png',
+      svg: SVG_RADA,
+      voice: { pitch: 0.25, rate: 0.6, prefer: ['Albert','Bad News','Bruce','Ralph','Bahh'] },
+      sayProblem: (a, b) => `Ho ho ho. Tell me... ${a} times ${b}.`
+    }
+  ];
+
+  // ----- Audio (Web Audio API) -----
+  let audioCtx = null;
+  function getCtx() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playTone(freq, duration, type, startOffset, gainValue) {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const t0 = ctx.currentTime + (startOffset || 0);
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(gainValue || 0.2, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.05);
+  }
+
+  function happyChime() {
+    // bright ascending arpeggio
+    playTone(659.25, 0.18, 'sine', 0.00, 0.25); // E5
+    playTone(783.99, 0.18, 'sine', 0.10, 0.25); // G5
+    playTone(987.77, 0.30, 'sine', 0.20, 0.28); // B5
+  }
+
+  function wrongChime() {
+    // soft low descending
+    playTone(330, 0.20, 'sine', 0.00, 0.18); // E4
+    playTone(247, 0.30, 'sine', 0.12, 0.18); // B3
+  }
+
+  function popSound() {
+    // short, bright pop for each firework burst — random pitch adds sparkle
+    const freq = 600 + Math.random() * 500;
+    playTone(freq,       0.12, 'triangle', 0.00, 0.18);
+    playTone(freq * 0.5, 0.25, 'sine',     0.04, 0.10);
+  }
+
+  // ----- Confetti / fireworks -----
+  const CONFETTI_COLORS = ['#ff4d4d','#ff9a3d','#ffd54d','#7cd66d','#5cb6ff','#b06dff','#ff6dc1'];
+  const confettiLayer = document.getElementById('confetti-layer');
+
+  function spawnConfetti(x, y, count, opts) {
+    opts = opts || {};
+    const spread = opts.spread || 60;       // half-angle in degrees, 0 = straight, 180 = all directions
+    const power  = opts.power  || 220;      // base travel distance
+    const colors = opts.colors || CONFETTI_COLORS;
+    const upward = opts.upward !== false;   // bias particles upward (firework feel)
+
+    for (let i = 0; i < count; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+
+      // pick a launch angle: -spread..+spread around "up" (0deg = straight up)
+      const angleDeg = (Math.random() * 2 - 1) * spread;
+      const angleRad = angleDeg * Math.PI / 180;
+      const dist = power * (0.6 + Math.random() * 0.8);
+
+      // dx is horizontal component, dy is vertical (negative = up)
+      const dx = Math.sin(angleRad) * dist;
+      const dy = (upward ? -Math.cos(angleRad) : Math.cos(angleRad)) * dist
+                 + (80 + Math.random() * 220); // gravity pulls it down by the end
+
+      const rot  = (Math.random() > 0.5 ? 1 : -1) * (360 + Math.random() * 720);
+      const dur  = 1.1 + Math.random() * 1.0;
+      const size = 6 + Math.random() * 8;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const isCircle = Math.random() > 0.6;
+
+      piece.style.left   = (x - size / 2) + 'px';
+      piece.style.top    = (y - size / 2) + 'px';
+      piece.style.width  = size + 'px';
+      piece.style.height = (isCircle ? size : size * 1.4) + 'px';
+      piece.style.background = color;
+      piece.style.borderRadius = isCircle ? '50%' : '2px';
+      piece.style.setProperty('--dx',  dx + 'px');
+      piece.style.setProperty('--dy',  dy + 'px');
+      piece.style.setProperty('--rot', rot + 'deg');
+      piece.style.setProperty('--dur', dur + 's');
+
+      confettiLayer.appendChild(piece);
+      setTimeout(() => piece.remove(), dur * 1000 + 150);
+    }
+  }
+
+  function celebrateCorrect() {
+    // Small focused burst from the center of the card
+    const card = document.querySelector('.card');
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height * 0.45;
+    spawnConfetti(x, y, 28, { spread: 55, power: 240 });
+  }
+
+  function fireworks() {
+    // Multiple staggered bursts at random positions in the upper viewport
+    const w = window.innerWidth, h = window.innerHeight;
+    const burstCount = 6;
+    for (let i = 0; i < burstCount; i++) {
+      setTimeout(() => {
+        const x = w * (0.15 + Math.random() * 0.7);
+        const y = h * (0.18 + Math.random() * 0.35);
+        spawnConfetti(x, y, 45, { spread: 180, power: 300 });
+        popSound();
+      }, i * 320);
+    }
+    // One final big finale burst from the center of the card
+    setTimeout(() => {
+      const card = document.querySelector('.card');
+      if (card) {
+        const r = card.getBoundingClientRect();
+        spawnConfetti(r.left + r.width / 2, r.top + r.height / 2, 70, { spread: 180, power: 360 });
+        popSound();
+      }
+    }, burstCount * 320 + 100);
+  }
+
+  // ----- Speech (Web Speech API) -----
+  function pickVoice(prefer) {
+    if (!('speechSynthesis' in window)) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || !voices.length) return null;
+    if (prefer && prefer.length) {
+      for (const name of prefer) {
+        const v = voices.find(x => x.name && x.name.toLowerCase().includes(name.toLowerCase()));
+        if (v) return v;
+      }
+    }
+    return voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en')) || voices[0];
+  }
+
+  function speak(text, opts) {
+    if (!('speechSynthesis' in window)) return;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      const o = opts || {};
+      u.lang  = o.lang  || 'en-US';
+      u.rate  = (o.rate  != null) ? o.rate  : 0.95;
+      u.pitch = (o.pitch != null) ? o.pitch : 1.05;
+      const v = pickVoice(o.prefer);
+      if (v) u.voice = v;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* ignore */ }
+  }
+
+  // Pre-load voices (some browsers need this)
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = function () {
+      window.speechSynthesis.getVoices();
+    };
+    window.speechSynthesis.getVoices();
+  }
+
+  // ----- Game logic -----
+  function renderProgress() {
+    const cells = progressBarEl.children;
+    const filled = Math.max(0, Math.min(10, tableStreak));
+    for (let i = 0; i < cells.length; i++) {
+      cells[i].classList.toggle('filled', i < filled);
+    }
+  }
+
+  function updateModeUI() {
+    modeLabelEl.textContent = MODE_LABEL[currentMode];
+    modeLabelEl.className = 'mode-label ' + currentMode;
+    document.body.classList.remove('dog', 'cheetah');
+    if (currentMode !== 'snail') document.body.classList.add(currentMode);
+  }
+
+  function stopTimer() {
+    if (timerId) { clearTimeout(timerId); timerId = null; }
+    // DON'T reset timerStartMs/timerDurationMs — wall-clock preserves them so
+    // captureLive can snapshot the ORIGINAL start moment.
+    // reset visual
+    timerBarEl.style.transition = 'none';
+    timerBarEl.style.width = '100%';
+    timerEl.classList.remove('active');
+  }
+
+  // Wall-clock timer. `startAtMs` is the ABSOLUTE moment this chance began
+  // (e.g., when the problem was first shown, or when 1st chance ended for
+  // a natural 2nd-chance chain). Elapsed is computed against wall clock,
+  // so tab-switching cannot pause or reset the timer.
+  function startTimer(startAtMs) {
+    stopTimer();
+    const secs = MODE_SECONDS[currentMode];
+    if (!secs) return; // snail mode (no timer)
+    const durationMs = secs * 1000;
+    const nowMs = Date.now();
+    const startMs = (typeof startAtMs === 'number' && startAtMs > 0) ? startAtMs : nowMs;
+    const elapsed = nowMs - startMs;
+    const remainMs = durationMs - elapsed;
+
+    timerStartMs = startMs;
+    timerDurationMs = durationMs;
+
+    if (remainMs <= 0) {
+      // Wall-clock says this chance already expired (kid was away too long).
+      timerEl.classList.add('active');
+      timerBarEl.style.transition = 'none';
+      timerBarEl.style.width = '0%';
+      timerId = setTimeout(handleTimeout, 0);
+      return;
+    }
+
+    const startPct = (remainMs / durationMs) * 100;
+    timerEl.classList.add('active');
+    timerBarEl.style.transition = 'none';
+    timerBarEl.style.width = startPct + '%';
+    void timerBarEl.offsetWidth;
+    timerBarEl.style.transition = 'width ' + (remainMs / 1000) + 's linear';
+    timerBarEl.style.width = '0%';
+
+    timerId = setTimeout(handleTimeout, remainMs);
+  }
+
+  function handleTimeout() {
+    timerId = null;
+    wrongChime();
+    if (typeof postEvent === 'function') postEvent({ type: 'timeout', op: operation, table: currentTable, mode: currentMode });
+
+    if (currentMode === 'cheetah') {
+      if (inSecondChance) {
+        // 2nd chance timed out → STRIKE 2 → reset table
+        handleCheetahStrike2();
+        return;
+      }
+
+      // 1st chance timed out → STRIKE 1 → offer 2nd chance
+      cheetahFailures += 1;
+      inSecondChance = true;
+      const secondChanceStart = timerStartMs + timerDurationMs;
+      feedbackEl.textContent = `⚠️ STRIKE 1! Time's up — you get one more chance on this problem!`;
+      feedbackEl.className = 'feedback wrong';
+      answerEl.value = '';
+      answerEl.focus();
+      if (typeof postEvent === 'function') postEvent({ type: 'cheetah-strike', op: operation, table: currentTable, strikeNumber: 1 });
+      startTimer(secondChanceStart);
+      return;
+    }
+
+    // Dog mode timeout: single-chance retry with a fresh timer
+    feedbackEl.textContent = "⏰ Time's up — try again!";
+    feedbackEl.className = 'feedback wrong';
+    answerEl.value = '';
+    answerEl.focus();
+    startTimer();
+  }
+
+  function refillBag() {
+    // factors 1..10 → 10 distinct problems per table, asked in shuffled order.
+    // Bag size matches the 10-streak goal so the kid sees every problem once
+    // before any can repeat.
+    const factors = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    for (let i = factors.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = factors[i]; factors[i] = factors[j]; factors[j] = tmp;
+    }
+    // avoid the same factor appearing twice in a row across bag boundaries
+    if (bag.__last != null && factors[0] === bag.__last && factors.length > 1) {
+      const tmp = factors[0]; factors[0] = factors[1]; factors[1] = tmp;
+    }
+    bag = factors;
+  }
+
+  function nextFactor() {
+    if (bag.length === 0) refillBag();
+    const f = bag.shift();
+    bag.__last = f;
+    return f;
+  }
+
+  function showCharacter(c) {
+    // Escape the SVG fallback for safe embedding in an onerror attribute
+    const svgFallback = c.svg.replace(/'/g, "\\'").replace(/\n/g, ' ');
+    const visual = c.img
+      ? `<img src="${c.img}" alt="${c.name}" referrerpolicy="no-referrer"
+            onerror="this.outerHTML='${svgFallback}'">`
+      : c.svg;
+    characterEl.innerHTML = visual + '<div class="character-name">' + c.name + '</div>';
+  }
+
+  // forceFresh:
+  //   true  (default) — dispense a brand-new problem from the bag (after correct
+  //                     answers, mode transitions, cheetah failures).
+  //   false           — if a sticky problem is in flight (a > 0 && b > 0), show
+  //                     it instead of dispensing. Used on initial load and on
+  //                     operation-tab switch so the kid can't skip a hard
+  //                     question by hopping to the other tab and back.
+  function newProblem(forceFresh) {
+    forceFresh = (forceFresh !== false); // default true
+    stopTimer();
+
+    if (!forceFresh && a > 0 && b > 0) {
+      // Sticky restore: keep the same a/b/correctAnswer/inSecondChance AND
+      // resume the timer with only the time that was left when the kid
+      // switched away (closes the tab-swap-to-freeze-timer loophole).
+      problemEl.textContent = operation === 'division'
+        ? (a + ' ÷ ' + b)
+        : (a + ' × ' + b);
+      answerEl.value = '';
+      answerEl.disabled = false;
+      submitBtn.disabled = false;
+      if (attemptsEl) attemptsEl.textContent = '';
+      const cR = characters[charIndex % characters.length];
+      charIndex++;
+      showCharacter(cR);
+      answerEl.focus();
+      const resumeStart = pendingTimerStartMs;
+      pendingTimerStartMs = null;
+      // Wall-clock resume: pass the ORIGINAL chance start moment. startTimer
+      // computes elapsed from wall clock and fires timeout if already expired.
+      startTimer(resumeStart);
+      return;
+    }
+
+    // Fresh dispense path
+    inSecondChance = false;
+    const f = nextFactor();
+    if (operation === 'division') {
+      // Asks "(table × f) ÷ table = ?" — answer is f
+      a = currentTable * f; // dividend
+      b = currentTable;     // divisor
+      correctAnswer = f;
+      problemEl.textContent = a + ' ÷ ' + b;
+    } else {
+      a = currentTable;
+      b = f;
+      correctAnswer = a * b;
+      problemEl.textContent = a + ' × ' + b;
+    }
+    answerEl.value = '';
+    answerEl.disabled = false;
+    submitBtn.disabled = false;
+    if (attemptsEl) attemptsEl.textContent = '';
+
+    const c = characters[charIndex % characters.length];
+    charIndex++;
+    showCharacter(c);
+
+    answerEl.focus();
+    startTimer(); // no-op in snail mode
+  }
+
+  function checkMilestones() {
+    // Praise at 3, 5, 8 in a row within the current table.
+    // 10 in a row triggers the table-complete flow instead.
+    const milestones = [
+      { n: 3, text: 'Good work' },
+      { n: 5, text: 'Great job' },
+      { n: 8, text: 'Fantastic' }
+    ];
+    for (const m of milestones) {
+      if (tableStreak === m.n && !praiseShownAt.has(m.n)) {
+        praiseShownAt.add(m.n);
+        saveState();
+        praiseEl.textContent = m.text + '!';
+        // small delay so the happy chime doesn't clash with the voice
+        setTimeout(() => speak(m.text, { lang: 'en-US', rate: 0.95, pitch: 1.05 }), 350);
+      }
+    }
+  }
+
+  function speakThenAdvance(msg, advance) {
+    setTimeout(() => {
+      if ('speechSynthesis' in window) {
+        try {
+          const u = new SpeechSynthesisUtterance(msg);
+          u.lang = 'en-US';
+          u.rate = 0.95;
+          u.pitch = 1.05;
+          const v = pickVoice();
+          if (v) u.voice = v;
+          u.onend = advance;
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(u);
+          // safety fallback in case onend never fires (some browsers swallow it)
+          setTimeout(advance, 10000);
+          return;
+        } catch (e) { /* fall through */ }
+      }
+      setTimeout(advance, 3000);
+    }, 350);
+  }
+
+  function completeStage() {
+    stopTimer();
+    feedbackEl.textContent = '';
+    let advanced = false;
+
+    const completedMode = currentMode;
+    const completedTable = currentTable;
+    const isLastMode = MODE_ORDER.indexOf(completedMode) === MODE_ORDER.length - 1;
+
+    // Cheetah is the last mode. Completing it = the table is "mastered" — lock
+    // this table's Robucks to exactly 100 (cap over-earned or top up under-earned).
+    let reachedGoal = false;
+    if (completedMode === 'cheetah') {
+      // COMMIT the provisional Robucks. Cap at 100 per table so re-completions
+      // don't stack. Prior Robucks on this table (from an earlier completion)
+      // stay locked in — we only ADD what tops it up to 100.
+      const alreadyCommitted = tablePoints[completedTable] || 0;
+      const topUp = Math.max(0, 100 - alreadyCommitted);
+      tablePoints[completedTable] = alreadyCommitted + topUp;
+      points = Math.max(0, points + topUp);
+      cheetahRunEarned = 0;
+      pointsEl.textContent = points;
+      // Clear any stale frozen Cheetah slot for this table (we just mastered it).
+      // Snail/Dog frozen slots for the same table stay untouched.
+      if (combined[operation] && combined[operation].frozenModeStates && combined[operation].frozenModeStates[completedTable]) {
+        delete combined[operation].frozenModeStates[completedTable].cheetah;
+      }
+      // Check if the kid just reached 1000 Robucks
+      if (points >= 1000) {
+        reachedGoal = true;
+      }
+    }
+
+    let nextMode, nextTable, screenMsg, spokenMsg;
+
+    if (!isLastMode) {
+      // Advance to next mode on the same table
+      nextMode = MODE_ORDER[MODE_ORDER.indexOf(completedMode) + 1];
+      nextTable = completedTable;
+      const nextSecs = MODE_SECONDS[nextMode];
+      screenMsg = `🎉 10/10 in ${MODE_LABEL[completedMode]} for the ${completedTable} table! EXCELLENT — now try ${MODE_LABEL[nextMode]}.`;
+      spokenMsg = `You have reached 10 out of 10 in ${MODE_SPOKEN[completedMode]} for the ${completedTable} table. Excellent! Now switching to ${MODE_SPOKEN[nextMode]}. You have ${nextSecs} seconds per question.`;
+    } else {
+      // Final mode done → advance to next table back to first mode
+      const wrapAround = completedTable >= 10;
+      nextTable = wrapAround ? 2 : completedTable + 1;
+      nextMode = MODE_ORDER[0];
+      screenMsg = wrapAround
+        ? `🎉 10/10 in ${MODE_LABEL[completedMode]}! EXCELLENT — you finished all 10 tables! 🏆 Robucks reset to 0. Starting over from Table 2!`
+        : `🎉 10/10 in ${MODE_LABEL[completedMode]} for the ${completedTable} table! EXCELLENT — moving to the ${nextTable} table.`;
+      spokenMsg = wrapAround
+        ? `You have reached 10 out of 10 in ${MODE_SPOKEN[completedMode]} for the ${completedTable} table. Excellent! You finished all 10 tables! Your Robucks have been reset to zero. Let's start over from Table 2.`
+        : `You have reached 10 out of 10 in ${MODE_SPOKEN[completedMode]} for the ${completedTable} table. Excellent! Let's move to the ${nextTable} table.`;
+
+      // Reset Robucks when completing the full cycle (all 10 tables)
+      if (wrapAround) {
+        points = 0;
+        tablePoints = {};
+        pointsEl.textContent = points;
+        // Persist the reset immediately
+        saveState();
+      }
+    }
+
+    // Special case: kid reached 1000 Robucks! 🎉
+    if (reachedGoal) {
+      praiseEl.textContent = `🎉 CONGRATULATIONS! 🎉 You earned all 1000 Robucks! You are a math superstar! 🌟 Starting over from Table 2...`;
+      // Extra celebration: rapid confetti bursts
+      for (let i = 0; i < 5; i++) {
+        setTimeout(() => fireworks(), i * 200);
+      }
+      if (typeof postEvent === 'function') {
+        postEvent({ type: 'mode-complete', op: operation, table: completedTable, mode: completedMode });
+        if (isLastMode) postEvent({ type: 'table-complete', op: operation, table: completedTable });
+      }
+      // IMMEDIATELY reset and save so it survives refresh/navigation before auto-advance
+      points = 0;
+      tablePoints = {};
+      pointsEl.textContent = points;
+      currentTable = 2;
+      currentMode = 'snail';
+      tableStreak = 0;
+      cheetahFailures = 0;
+      praiseShownAt.clear();
+      bag = [];
+      if (combined[operation]) {
+        if (!combined[operation].lastModePerTable) combined[operation].lastModePerTable = {};
+        combined[operation].lastModePerTable[currentTable] = currentMode;
+      }
+      saveState(); // Save immediately so it persists even if kid refreshes
+      // Auto-advance UI after 5 seconds (the state is already reset and saved)
+      setTimeout(() => {
+        if (advanced) return;
+        advanced = true;
+        tableNumEl.textContent = currentTable;
+        updateTablePickerUI();
+        updateModePickerUI();
+        renderProgress();
+        updateModeUI();
+        praiseEl.textContent = '';
+        newProblem();
+      }, 5000);
+      return;
+    }
+
+    praiseEl.textContent = screenMsg;
+    fireworks();
+    if (typeof postEvent === 'function') {
+      postEvent({ type: 'mode-complete', op: operation, table: completedTable, mode: completedMode });
+      if (isLastMode) {
+        postEvent({ type: 'table-complete', op: operation, table: completedTable });
+      }
+    }
+    const advance = () => {
+      if (advanced) return;
+      advanced = true;
+      currentTable = nextTable;
+      currentMode = nextMode;
+      tableStreak = 0;
+      cheetahFailures = 0; // every fresh mode entry starts with no failures
+      praiseShownAt.clear();
+      bag = [];
+      // Record the new mode as sticky for this table so a bare table-picker
+      // click brings the kid back here rather than dumping them into Snail.
+      if (combined[operation]) {
+        if (!combined[operation].lastModePerTable) combined[operation].lastModePerTable = {};
+        combined[operation].lastModePerTable[currentTable] = currentMode;
+      }
+      tableNumEl.textContent = currentTable;
+      updateTablePickerUI();
+      updateModePickerUI();
+      renderProgress();
+      updateModeUI();
+      saveState();
+      praiseEl.textContent = '';
+      newProblem();
+    };
+    speakThenAdvance(spokenMsg, advance);
+  }
+
+  // Discard any provisional Robucks from an aborted cheetah run.
+  // Under commit-only-completion, per-question earnings are NOT added to
+  // points/tablePoints during the run — they only track how much would be
+  // committed on 10/10. So an abort just resets the tracker to 0.
+  function rollbackCheetahRun() {
+    cheetahRunEarned = 0;
+  }
+
+  // Freeze the current (table, mode) state so kid can resume EXACTLY where
+  // they left off — same problem, same streak, same wall-clock timer.
+  // Works for all 3 modes (Snail has trivial timer info; Dog and Cheetah
+  // save the wall-clock start so leaving the mode can't pause the clock).
+  function freezeCurrentModeState() {
+    const opState = combined[operation];
+    if (!opState) return;
+    if (!opState.frozenModeStates) opState.frozenModeStates = {};
+    if (!opState.frozenModeStates[currentTable]) opState.frozenModeStates[currentTable] = {};
+
+    let cp = null;
+    if (a > 0 && b > 0) {
+      cp = { a: a, b: b, correctAnswer: correctAnswer, inSecondChance: inSecondChance };
+      if (timerStartMs > 0 && timerDurationMs > 0) {
+        cp.timerStartMs = timerStartMs;
+        cp.timerDurationMs = timerDurationMs;
+      }
+    }
+    opState.frozenModeStates[currentTable][currentMode] = {
+      tableStreak: tableStreak,
+      cheetahRunEarned: cheetahRunEarned,
+      cheetahFailures: cheetahFailures,
+      bag: bag.slice(),
+      currentProblem: cp,
+      inSecondChance: inSecondChance,
+      praiseShownAt: Array.from(praiseShownAt)
+    };
+  }
+
+  // If a frozen state exists for (op, currentTable, currentMode), restore it.
+  // Consumes the slot so a future leave/enter re-freezes with fresh data.
+  function tryRestoreFrozenModeState() {
+    const opState = combined[operation];
+    if (!opState || !opState.frozenModeStates) return false;
+    const tableStates = opState.frozenModeStates[currentTable];
+    if (!tableStates) return false;
+    const frozen = tableStates[currentMode];
+    if (!frozen) return false;
+
+    tableStreak     = (typeof frozen.tableStreak === 'number') ? frozen.tableStreak : 0;
+    cheetahRunEarned= (typeof frozen.cheetahRunEarned === 'number') ? frozen.cheetahRunEarned : 0;
+    cheetahFailures = (typeof frozen.cheetahFailures === 'number') ? frozen.cheetahFailures : 0;
+    bag             = Array.isArray(frozen.bag) ? frozen.bag.slice() : [];
+    praiseShownAt   = new Set(Array.isArray(frozen.praiseShownAt) ? frozen.praiseShownAt : []);
+
+    if (frozen.currentProblem) {
+      a = frozen.currentProblem.a;
+      b = frozen.currentProblem.b;
+      correctAnswer = frozen.currentProblem.correctAnswer;
+      inSecondChance = !!frozen.currentProblem.inSecondChance;
+      pendingTimerStartMs = (typeof frozen.currentProblem.timerStartMs === 'number' && frozen.currentProblem.timerStartMs > 0)
+        ? frozen.currentProblem.timerStartMs
+        : null;
+    } else {
+      a = 0; b = 0; correctAnswer = 0;
+      inSecondChance = !!frozen.inSecondChance;
+      pendingTimerStartMs = null;
+    }
+
+    delete tableStates[currentMode];
+    return true;
+  }
+
+  function handleCorrect() {
+    stopTimer();
+    // Cheetah Robucks are PROVISIONAL during a run. We track the earned
+    // amount in cheetahRunEarned but do NOT add to points/tablePoints until
+    // 10/10 completion (see completeStage cheetah branch). This closes every
+    // partial-earn exploit: tab-hop, mode-switch, refresh, demote — nothing
+    // to leak if never committed.
+    // Cap applies so a re-attempt on an already-mastered table (tp[N] = 100)
+    // earns nothing.
+    if (currentMode === 'cheetah') {
+      const alreadyCommitted = tablePoints[currentTable] || 0;
+      const room = Math.max(0, 100 - alreadyCommitted - cheetahRunEarned);
+      const awarded = Math.min(10, room);
+      cheetahRunEarned += awarded;
+    }
+    tableStreak += 1;
+    // Don't update points display here — points only increment when table completes (100 at a time)
+    // Post event with attempt flag (1st or 2nd attempt)
+    if (typeof postEvent === 'function') {
+      postEvent({ type: 'correct', op: operation, table: currentTable, mode: currentMode, firstAttempt: !inSecondChance });
+    }
+    renderProgress();
+    saveState();
+    if (typeof postEvent === 'function') postEvent({ type: 'correct', op: operation, table: currentTable, mode: currentMode });
+    feedbackEl.textContent = '✓ Correct!';
+    feedbackEl.className = 'feedback right';
+    happyChime();
+    celebrateCorrect();
+    answerEl.disabled = true;
+    submitBtn.disabled = true;
+
+    if (tableStreak >= 10) {
+      completeStage();
+    } else {
+      checkMilestones();
+      setTimeout(() => {
+        feedbackEl.textContent = '';
+        praiseEl.textContent = '';
+        newProblem();
+      }, 1400);
+    }
+  }
+
+  // Snail-mode wrong handler: unlimited retries, counter never resets on wrong.
+  function handleWrong() {
+    wrongChime();
+    if (typeof postEvent === 'function') postEvent({ type: 'wrong', op: operation, table: currentTable, mode: currentMode });
+    feedbackEl.textContent = '✗ Not quite — try again!';
+    feedbackEl.className = 'feedback wrong';
+    answerEl.value = '';
+    answerEl.focus();
+  }
+
+  // Timed-mode wrong handler. Dog: unlimited retries with timer reset.
+  // Cheetah: two chances total with strike system.
+  // Strike 1 (1st attempt wrong): show message, offer 2nd chance
+  // Strike 2 (2nd attempt wrong): reset table to problem 1, lose Robucks earned this run
+  function handleTimedWrong() {
+    wrongChime();
+    if (typeof postEvent === 'function') postEvent({ type: 'wrong', op: operation, table: currentTable, mode: currentMode });
+
+    if (currentMode === 'cheetah') {
+      if (inSecondChance) {
+        // 2nd attempt wrong → STRIKE 2 → reset table
+        handleCheetahStrike2();
+        return;
+      }
+
+      // 1st attempt wrong → STRIKE 1 → offer 2nd chance
+      cheetahFailures += 1;
+      inSecondChance = true;
+      feedbackEl.textContent = `⚠️ STRIKE 1! That's wrong — you get one more chance on this problem!`;
+      feedbackEl.className = 'feedback wrong';
+      answerEl.value = '';
+      answerEl.focus();
+      if (typeof postEvent === 'function') postEvent({ type: 'cheetah-strike', op: operation, table: currentTable, strikeNumber: 1 });
+      // Fresh 10s from now — kid earned a full 2nd attempt
+      startTimer(Date.now());
+      return;
+    }
+
+    // Dog mode: unlimited retries with fresh timer
+    feedbackEl.textContent = '✗ Wrong — try again!';
+    feedbackEl.className = 'feedback wrong';
+    answerEl.value = '';
+    answerEl.focus();
+    startTimer(Date.now());
+  }
+
+  // Both Cheetah chances used up on a single question — that's a failure.
+  // 1st failure: reset the Cheetah counter to 0 (stay in Cheetah for the same table).
+  // 2nd failure: demote back to Snail mode for the same table.
+  // STRIKE 2: reset the current table in Cheetah mode (back to problem 1)
+  // Kid loses any Robucks earned during this run and restarts from 0/10.
+  function handleCheetahStrike2() {
+    stopTimer();
+    answerEl.disabled = true;
+    submitBtn.disabled = true;
+
+    const lostPoints = cheetahRunEarned;
+    rollbackCheetahRun(); // clear provisional Robucks
+
+    praiseEl.textContent = `⚠️ STRIKE 2! Table reset to problem 1.${lostPoints > 0 ? ` You lost the ${lostPoints} Robucks you would have earned.` : ''}`;
+    if (typeof postEvent === 'function') postEvent({ type: 'cheetah-strike', op: operation, table: currentTable, strikeNumber: 2 });
+
+    // Verbal feedback for Strike 2
+    if ('speechSynthesis' in window) {
+      try {
+        const utterance = new SpeechSynthesisUtterance('Table is now being reset back.');
+        utterance.rate = 0.95;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {}
+    }
+
+    // Reset the run for this table: back to 0/10, fresh bag
+    tableStreak = 0;
+    cheetahFailures = 0; // reset strike counter for this new attempt
+    inSecondChance = false;
+    praiseShownAt.clear();
+    bag = []; // force fresh problem on next newProblem()
+    a = 0; b = 0; correctAnswer = 0;
+    pendingTimerStartMs = null;
+
+    renderProgress();
+    updateModeUI();
+    saveState();
+
+    // After a brief delay, show the first problem again
+    setTimeout(() => {
+      answerEl.disabled = false;
+      submitBtn.disabled = false;
+      praiseEl.textContent = '';
+      feedbackEl.textContent = '';
+      newProblem();
+    }, 2000);
+  }
+
+  function handleCheetahFailure() {
+    stopTimer();
+    wrongChime();
+    cheetahFailures += 1;
+    tableStreak = 0;
+    praiseShownAt.clear();
+    renderProgress();
+    answerEl.disabled = true;
+    submitBtn.disabled = true;
+    feedbackEl.textContent = '';
+
+    if (cheetahFailures >= 2) {
+      // Demote ALL the way back to Snail Mode in the same table.
+      // Under commit-only-completion, nothing was added to points/tablePoints
+      // during this run — so the "loss" is just the provisional earnings.
+      // Prior 10/10 completions on this table stay locked in.
+      const lostPoints = cheetahRunEarned;
+      rollbackCheetahRun(); // just resets the tracker to 0
+
+      const lossLine = lostPoints > 0
+        ? ` You lost the ${lostPoints} Robucks you would have earned this attempt.`
+        : '';
+      const screenMsg = `🐌 Cheetah Mode is tough! Going all the way back to Snail Mode for Table ${currentTable}.${lossLine} Work your way back up through Dog and Cheetah Modes.`;
+      const spokenMsg = `That's two strikes in cheetah mode. Going back to snail mode for the ${currentTable} table.${lostPoints > 0 ? ' You lost the ' + lostPoints + ' Robucks you would have earned this attempt.' : ''} Work your way back up.`;
+      praiseEl.textContent = screenMsg;
+      if (typeof postEvent === 'function') postEvent({ type: 'cheetah-demote', op: operation, table: currentTable, toMode: 'snail', pointsLost: lostPoints });
+      // Clear the frozen Cheetah slot for this table — that run is over.
+      // Snail/Dog frozen slots stay (kid may have progress there to resume).
+      if (combined[operation] && combined[operation].frozenModeStates && combined[operation].frozenModeStates[currentTable]) {
+        delete combined[operation].frozenModeStates[currentTable].cheetah;
+      }
+      // Kid is being sent to Snail — record that as the sticky last mode.
+      if (combined[operation]) {
+        if (!combined[operation].lastModePerTable) combined[operation].lastModePerTable = {};
+        combined[operation].lastModePerTable[currentTable] = 'snail';
+      }
+      currentMode = 'snail';
+      cheetahFailures = 0;
+      bag = [];
+      updateModeUI();
+      updateModePickerUI();
+      saveState();
+      speakThenAdvance(spokenMsg, () => {
+        praiseEl.textContent = '';
+        newProblem();
+      });
+    } else {
+      // First failure — reset streak but keep the provisional earnings (kid still has a chance to complete)
+      const atRisk = cheetahRunEarned;
+      const riskLine = atRisk > 0 ? ` and lose the ${atRisk} Robucks you would have earned` : '';
+      const screenMsg = `🐆 Restart! Cheetah Mode for the ${currentTable} table is back at 0/10. One more failure and you go all the way back to Snail Mode${riskLine}.`;
+      const spokenMsg = `Oh no! Cheetah mode for the ${currentTable} table is restarting from the beginning. One more strike and you go all the way back to snail mode${atRisk > 0 ? ' and lose the ' + atRisk + ' Robucks you would have earned' : ''}.`;
+      praiseEl.textContent = screenMsg;
+      if (typeof postEvent === 'function') postEvent({ type: 'cheetah-restart', op: operation, table: currentTable });
+      bag = [];
+      saveState();
+      speakThenAdvance(spokenMsg, () => {
+        praiseEl.textContent = '';
+        newProblem();
+      });
+    }
+  }
+
+  function submit() {
+    const raw = answerEl.value.trim();
+    if (raw === '') { answerEl.focus(); return; }
+    const guess = parseInt(raw, 10);
+    if (isNaN(guess)) { answerEl.focus(); return; }
+    // user gesture — make sure audio is unlocked
+    getCtx();
+    // Stop the timer the moment the kid commits an answer in any timed mode
+    if (MODE_SECONDS[currentMode] > 0) stopTimer();
+
+    if (guess === correctAnswer) {
+      handleCorrect();
+    } else if (MODE_SECONDS[currentMode] > 0) {
+      handleTimedWrong();
+    } else {
+      handleWrong();
+    }
+  }
+
+  submitBtn.addEventListener('click', submit);
+  answerEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); submit(); }
+  });
+
+  // ----- Operation toggle (Multiplication / Division) -----
+  function updateOpToggleUI() {
+    const btns = opToggleEl.querySelectorAll('.op-btn');
+    for (let i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-op') === operation);
+    }
+    titleEl.textContent = operation === 'division'
+      ? 'Division Practice'
+      : 'Multiplication Practice';
+  }
+
+  function setOperation(newOp) {
+    if (newOp !== 'multiplication' && newOp !== 'division') return;
+    if (newOp === operation) return;
+    // Tab switch preserves per-op state naturally — the Cheetah run on this
+    // op continues on the wall clock. No rollback needed: (a) points aren't
+    // committed until 10/10 anyway, (b) captureLive snapshots the wall-clock
+    // start time so restoring later triggers timeout if elapsed exceeded duration.
+    combined[operation] = captureLive();
+    // Switch active op and apply the other op's state — applyLive will restore
+    // the saved bag and current problem (if any) so the kid can't skip a hard
+    // problem by hopping to the other tab and back.
+    operation = newOp;
+    combined.op = operation;
+    applyLive(combined[operation]);
+    saveState();
+    if (typeof postEvent === 'function') postEvent({ type: 'switch-op', op: operation });
+    // Cancel any in-flight timer / speech (timer restarts inside newProblem)
+    stopTimer();
+    if ('speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch (e) {}
+    }
+    // Re-render everything
+    updateOpToggleUI();
+    updateTablePickerUI();
+    updateModePickerUI();
+    pointsEl.textContent = points;
+    renderProgress();
+    tableNumEl.textContent = currentTable;
+    updateModeUI();
+    feedbackEl.textContent = '';
+    praiseEl.textContent = '';
+    // forceFresh=false → restore the sticky problem if one was in flight
+    newProblem(false);
+  }
+
+  opToggleEl.addEventListener('click', function (e) {
+    const btn = e.target.closest && e.target.closest('.op-btn');
+    if (!btn) return;
+    setOperation(btn.getAttribute('data-op'));
+  });
+
+  // ----- Table + Mode pickers -----
+  function updateTablePickerUI() {
+    // Enforce sequential progression: find the highest completed table
+    // (tablePoints[t] >= 100), then allow access to 2 through highestCompleted + 1.
+    let highestCompleted = 1; // Table 1 is always done (freebie)
+    for (let t = 2; t <= 10; t++) {
+      if ((tablePoints[t] || 0) >= 100) highestCompleted = t;
+    }
+    const maxAccessible = Math.min(highestCompleted + 1, 10);
+
+    const btns = tablePickerEl.querySelectorAll('.picker-btn');
+    for (let i = 0; i < btns.length; i++) {
+      const t = Number(btns[i].getAttribute('data-table'));
+      const isActive = t === currentTable;
+      const isAccessible = t >= 2 && t <= maxAccessible;
+      btns[i].classList.toggle('active', isActive);
+      btns[i].classList.toggle('disabled', !isAccessible);
+      btns[i].style.opacity = isAccessible ? '1' : '0.4';
+      btns[i].style.pointerEvents = isAccessible ? 'auto' : 'none';
+      btns[i].style.cursor = isAccessible ? 'pointer' : 'not-allowed';
+    }
+  }
+
+  function updateModePickerUI() {
+    const btns = modePickerEl.querySelectorAll('.picker-btn');
+    for (let i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-mode') === currentMode);
+    }
+    filterModePickerButtons(); // Apply mode filtering based on settings
+  }
+
+  // Jump directly to a chosen (table, mode). Resets in-progress state
+  // (streak, bag, current problem, cheetah failures, second-chance flag)
+  // but preserves accumulated Robucks and per-table earnings.
+  function jumpTo(newTable, newMode) {
+    if (typeof newTable !== 'number' || newTable < 2 || newTable > 10) return;
+    if (MODE_ORDER.indexOf(newMode) === -1) return;
+    if (newTable === currentTable && newMode === currentMode) return;
+
+    // Freeze the CURRENT (table, mode) state — works for all 3 modes so
+    // switching mode/table always resumes exactly where the kid left off.
+    freezeCurrentModeState();
+
+    stopTimer();
+    if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+
+    currentTable = newTable;
+    currentMode  = newMode;
+
+    // Resume any frozen state for (op, newTable, newMode)
+    const resumed = tryRestoreFrozenModeState();
+
+    if (!resumed) {
+      // Fresh start for this (table, mode) combination
+      tableStreak     = 0;
+      cheetahFailures = 0;
+      inSecondChance  = false;
+      praiseShownAt.clear();
+      bag = [];
+      a = 0; b = 0; correctAnswer = 0;
+      cheetahRunEarned = 0;
+      pendingTimerStartMs = null;
+    }
+
+    // Record this as the sticky "last mode" for the target table so a bare
+    // table-picker click returns the kid here instead of defaulting to Snail.
+    {
+      const opState = combined[operation];
+      if (opState) {
+        if (!opState.lastModePerTable) opState.lastModePerTable = {};
+        opState.lastModePerTable[currentTable] = currentMode;
+      }
+    }
+
+    saveState();
+    if (typeof postEvent === 'function') {
+      postEvent({ type: 'switch-table-mode', op: operation, table: currentTable, mode: currentMode });
+      // Post table-start event only when starting a fresh table (Snail mode = first mode, not resumed)
+      if (newMode === 'snail' && !resumed) {
+        postEvent({ type: 'table-start', op: operation, table: newTable });
+      }
+    }
+
+    tableNumEl.textContent = currentTable;
+    updateTablePickerUI();
+    updateModePickerUI();
+    renderProgress();
+    updateModeUI();
+    feedbackEl.textContent = '';
+    praiseEl.textContent = '';
+    pointsEl.textContent = points;
+    // Resumed → sticky restore (keeps the problem + wall-clock timer).
+    // Fresh    → dispense a new problem.
+    newProblem(!resumed);
+  }
+
+  tablePickerEl.addEventListener('click', function (e) {
+    const btn = e.target.closest && e.target.closest('.picker-btn');
+    if (!btn) return;
+    const t = Number(btn.getAttribute('data-table'));
+    // Sticky mode per table: if the kid was previously on this table in Dog
+    // or Cheetah, take them back there (with the frozen problem + wall-clock
+    // timer). Only default to Snail for tables they've never touched.
+    const opState = combined[operation];
+    const remembered = (opState && opState.lastModePerTable && opState.lastModePerTable[t]);
+    const targetMode = (MODE_ORDER.indexOf(remembered) !== -1) ? remembered : 'snail';
+    jumpTo(t, targetMode);
+  });
+
+  modePickerEl.addEventListener('click', function (e) {
+    const btn = e.target.closest && e.target.closest('.picker-btn');
+    if (!btn) return;
+    const m = btn.getAttribute('data-mode');
+    jumpTo(currentTable, m);
+  });
+
+  // ----- Settings Management -----
+  const MODES_STORAGE_KEY = 'mp_modes_settings';
+  const defaultModes = { multiplication: ['snail', 'dog', 'cheetah'], division: ['snail', 'dog', 'cheetah'] };
+
+  function getEnabledModes() {
+    try {
+      const saved = localStorage.getItem(MODES_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : defaultModes;
+    } catch (e) {
+      return defaultModes;
+    }
+  }
+
+  function saveModes(modes) {
+    try {
+      localStorage.setItem(MODES_STORAGE_KEY, JSON.stringify(modes));
+    } catch (e) {}
+  }
+
+  function filterModePickerButtons() {
+    const enabledModes = getEnabledModes();
+    const opModes = operation === 'division' ? enabledModes.division : enabledModes.multiplication;
+    const btns = modePickerEl.querySelectorAll('.picker-btn');
+    for (let i = 0; i < btns.length; i++) {
+      const mode = btns[i].getAttribute('data-mode');
+      const isEnabled = opModes.includes(mode);
+      btns[i].style.display = isEnabled ? 'block' : 'none';
+    }
+  }
+
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsOverlay = document.getElementById('settings-overlay');
+  const settingsClose = document.getElementById('settings-close');
+  const settingsSave = document.getElementById('settings-save');
+  const settingsCancel = document.getElementById('settings-cancel');
+
+  if (settingsBtn) settingsBtn.addEventListener('click', function () {
+    if (settingsOverlay) {
+      const modes = getEnabledModes();
+      document.getElementById('mult-snail').checked = modes.multiplication.includes('snail');
+      document.getElementById('mult-dog').checked = modes.multiplication.includes('dog');
+      document.getElementById('mult-cheetah').checked = modes.multiplication.includes('cheetah');
+      document.getElementById('div-snail').checked = modes.division.includes('snail');
+      document.getElementById('div-dog').checked = modes.division.includes('dog');
+      document.getElementById('div-cheetah').checked = modes.division.includes('cheetah');
+      settingsOverlay.classList.remove('hidden');
+    }
+  });
+
+  if (settingsClose) settingsClose.addEventListener('click', function () {
+    if (settingsOverlay) settingsOverlay.classList.add('hidden');
+  });
+
+  if (settingsCancel) settingsCancel.addEventListener('click', function () {
+    if (settingsOverlay) settingsOverlay.classList.add('hidden');
+  });
+
+  if (settingsSave) settingsSave.addEventListener('click', function () {
+    const modes = {
+      multiplication: [
+        document.getElementById('mult-snail').checked ? 'snail' : null,
+        document.getElementById('mult-dog').checked ? 'dog' : null,
+        document.getElementById('mult-cheetah').checked ? 'cheetah' : null
+      ].filter(Boolean),
+      division: [
+        document.getElementById('div-snail').checked ? 'snail' : null,
+        document.getElementById('div-dog').checked ? 'dog' : null,
+        document.getElementById('div-cheetah').checked ? 'cheetah' : null
+      ].filter(Boolean)
+    };
+    // Ensure at least one mode is selected
+    if (modes.multiplication.length === 0) modes.multiplication = ['snail'];
+    if (modes.division.length === 0) modes.division = ['snail'];
+    saveModes(modes);
+    filterModePickerButtons();
+    if (settingsOverlay) settingsOverlay.classList.add('hidden');
+  });
+
+  // ----- Login + server sync -----
+  // postEvent is defined elsewhere; this is the login handler section
+
+  function postEvent(event) {
+    if (!userPin) return;
+    // Best-effort fire-and-forget; the game keeps working offline because
+    // localStorage is still the local source of truth.
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: userPin, state: combined, event: event })
+      }).then(function (res) {
+        if (res && res.status === 401) {
+          userPin = '';
+          showLoginOverlay();
+        }
+      }).catch(function () { /* offline ok */ });
+    } catch (e) { /* ignore */ }
+  }
+
+  async function tryLogin(pin) {
+    const loginErrorEl = document.getElementById('login-error');
+    const loginPinEl = document.getElementById('login-pin');
+
+    loginErrorEl.textContent = '';
+    if (!pin) { loginErrorEl.textContent = 'Type your code first.'; return; }
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pin })
+      });
+      if (res.ok) {
+        userPin = pin;
+        // PIN is NOT stored in localStorage — it's a session-only credential.
+        const overlay = document.getElementById('login-overlay');
+        if (overlay) overlay.classList.add('hidden');
+        // Show the current problem (or a fresh one if none is pending)
+        newProblem();
+        postEvent({ type: 'session-start' });
+      } else if (res.status === 401) {
+        loginErrorEl.textContent = 'Oops! Wrong code. Try again.';
+        loginPinEl.value = '';
+        loginPinEl.focus();
+      } else {
+        loginErrorEl.textContent = 'Server error. Try again.';
+      }
+    } catch (e) {
+      loginErrorEl.textContent = 'Could not connect. Try again later.';
+    }
+  }
+
+  const loginBtn = document.getElementById('login-btn');
+  const loginPinEl = document.getElementById('login-pin');
+  if (loginBtn) loginBtn.addEventListener('click', function () { tryLogin(loginPinEl.value.trim()); });
+  if (loginPinEl) loginPinEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); tryLogin(loginPinEl.value.trim()); }
+  });
+
+  // Render restored state before first problem
+  updateOpToggleUI();
+  updateTablePickerUI();
+  updateModePickerUI();
+  pointsEl.textContent = points;
+  renderProgress();
+  tableNumEl.textContent = currentTable;
+  updateModeUI();
+
+  // forceFresh=false so a problem saved from a prior session is restored
+  // instead of being rerolled — preserves stickiness across browser reloads too.
+  newProblem(false);
+})();
+</script>
+</body>
+</html>
