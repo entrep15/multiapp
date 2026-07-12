@@ -1613,7 +1613,6 @@
     }
     renderProgress();
     saveState();
-    if (typeof postEvent === 'function') postEvent({ type: 'correct', op: operation, table: currentTable, mode: currentMode });
     feedbackEl.textContent = '✓ Correct!';
     feedbackEl.className = 'feedback right';
     happyChime();

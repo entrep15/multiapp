@@ -33,14 +33,14 @@ async function getAllEvents() {
 }
 
 // Get statistics for a specific day (PT timezone)
-function getEventsByDay(allEvents, dayMs) {
+export function getEventsByDay(allEvents, dayMs) {
   const cutoff = dayMs;
   const nextDayMs = dayMs + (24 * 60 * 60 * 1000);
   return allEvents.filter(e => e.ts >= cutoff && e.ts < nextDayMs);
 }
 
 // Parse PT date and get midnight PT timestamp
-function getMidnightPT(date) {
+export function getMidnightPT(date) {
   const formatter = new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: '2-digit',
@@ -54,34 +54,47 @@ function getMidnightPT(date) {
   return new Date(year, month, day).getTime();
 }
 
-// Calculate day-over-day stats for a table
-function getTableStats(events, op, table, mode) {
-  const firstAttemptCorrect = events.filter(e =>
-    e.type === 'correct' && e.op === op && e.table === table && e.mode === mode && e.firstAttempt !== false
+// Calculate day-over-day stats for a table.
+//
+// Event-log facts this relies on (verified against live data):
+// - Each correct answer produces a 'correct' event carrying firstAttempt: true/false.
+//   (The client used to ALSO post a legacy duplicate without the flag — since removed —
+//   so unflagged 'correct' events must be ignored, never counted.)
+// - Each miss produces a 'cheetah-strike' event: strikeNumber 1 = missed 1st try
+//   (earns a 2nd chance), strikeNumber 2 = missed 2nd try (table resets).
+//
+// Therefore, per table:
+//   1st-try total   = flagged 1st-try corrects + strike-1 count
+//   2nd-try total   = strike-1 count (every strike 1 gets a 2nd chance)
+//   2nd-try correct = flagged 2nd-try corrects
+//   resets          = strike-2 count
+// Invariant: 2nd-try correct + resets === 2nd-try total.
+export function getTableStats(events, op, table, mode) {
+  const forTable = events.filter(e => e.op === op && e.table === table);
+
+  const firstAttemptCorrect = forTable.filter(e =>
+    e.type === 'correct' && e.mode === mode && e.firstAttempt === true
   ).length;
 
-  const totalFirstAttempts = events.filter(e =>
-    (e.type === 'correct' || e.type === 'wrong' || e.type === 'timeout') &&
-    e.op === op && e.table === table && e.mode === mode && e.firstAttempt !== false
+  const secondAttemptCorrect = forTable.filter(e =>
+    e.type === 'correct' && e.mode === mode && e.firstAttempt === false
   ).length;
 
-  const secondAttemptCorrect = events.filter(e =>
-    e.type === 'correct' && e.op === op && e.table === table && e.mode === mode && e.firstAttempt === false
-  ).length;
+  const strike1 = forTable.filter(e => e.type === 'cheetah-strike' && e.strikeNumber === 1).length;
+  const strike2 = forTable.filter(e => e.type === 'cheetah-strike' && e.strikeNumber === 2).length;
 
-  const totalSecondAttempts = events.filter(e =>
-    (e.type === 'correct' || e.type === 'wrong' || e.type === 'timeout') &&
-    e.op === op && e.table === table && e.mode === mode && e.firstAttempt === false
-  ).length;
+  const firstAttemptTotal = firstAttemptCorrect + strike1;
+  const secondAttemptTotal = strike1;
 
   return {
     firstAttemptCorrect,
-    firstAttemptTotal: totalFirstAttempts,
-    firstAttemptPct: totalFirstAttempts > 0 ? Math.round((firstAttemptCorrect / totalFirstAttempts) * 1000) / 10 : 0,
+    firstAttemptTotal,
+    firstAttemptPct: firstAttemptTotal > 0 ? Math.round((firstAttemptCorrect / firstAttemptTotal) * 1000) / 10 : 0,
     secondAttemptCorrect,
-    secondAttemptTotal: totalSecondAttempts,
-    secondAttemptPct: totalSecondAttempts > 0 ? Math.round((secondAttemptCorrect / totalSecondAttempts) * 1000) / 10 : 0,
-    resets: events.filter(e => e.type === 'cheetah-strike' && e.strikeNumber === 2 && e.op === op && e.table === table).length
+    secondAttemptTotal,
+    secondAttemptPct: secondAttemptTotal > 0 ? Math.round((secondAttemptCorrect / secondAttemptTotal) * 1000) / 10 : 0,
+    resets: strike2,
+    reconciles: secondAttemptCorrect + strike2 === secondAttemptTotal
   };
 }
 
@@ -101,31 +114,25 @@ function buildReportHTML(todayStats, yesterdayStats) {
       const today = todayStats[operation][table] || {};
       const yesterday = yesterdayStats[operation][table] || {};
 
-      // Only calculate improvements when both days have data; otherwise show "New Table" or no comparison
-      const firstImprovement = (today.firstAttemptTotal > 0 && yesterday.firstAttemptTotal > 0)
-        ? (today.firstAttemptPct || 0) - (yesterday.firstAttemptPct || 0)
-        : (today.firstAttemptTotal === 0 && yesterday.firstAttemptTotal === 0 ? 0 : null);
+      // Improvement cell: only compare when both days have data for that metric.
+      // Today only → "✨ New" (first day of data); no data today → "—" (nothing to compare).
+      const improvementCell = (todayTotal, todayPct, yTotal, yPct) => {
+        if (todayTotal > 0 && yTotal > 0) {
+          const d = todayPct - yPct;
+          if (d > 0) return { text: '↑ +' + d.toFixed(1) + '%', color: 'rgb(134, 239, 52)' };
+          if (d < 0) return { text: '↓ ' + Math.abs(d).toFixed(1) + '%', color: 'rgb(253, 165, 151)' };
+          return { text: '→ 0.0%', color: 'rgb(187, 247, 208)' };
+        }
+        if (todayTotal > 0) return { text: '✨ New', color: 'rgb(220, 252, 201)' };
+        return { text: '—', color: 'rgb(229, 229, 229)' };
+      };
 
-      const secondImprovement = (today.secondAttemptTotal > 0 && yesterday.secondAttemptTotal > 0)
-        ? (today.secondAttemptPct || 0) - (yesterday.secondAttemptPct || 0)
-        : (today.secondAttemptTotal === 0 && yesterday.secondAttemptTotal === 0 ? 0 : null);
+      const first = improvementCell(today.firstAttemptTotal || 0, today.firstAttemptPct || 0,
+                                    yesterday.firstAttemptTotal || 0, yesterday.firstAttemptPct || 0);
+      const second = improvementCell(today.secondAttemptTotal || 0, today.secondAttemptPct || 0,
+                                     yesterday.secondAttemptTotal || 0, yesterday.secondAttemptPct || 0);
 
       const resetImprovement = (today.resets || 0) - (yesterday.resets || 0);
-
-      const getColor = (pct) => {
-        if (pct === null) return 'rgb(220, 220, 220)';
-        if (pct > 0) return 'rgb(134, 239, 52)';
-        if (pct < 0) return 'rgb(253, 165, 151)';
-        return 'rgb(187, 247, 208)';
-      };
-
-      const formatImprovement = (value) => {
-        if (value === null) return '✨ New Table';
-        if (value > 0) return '↑ +' + Math.abs(value).toFixed(1) + '%';
-        if (value < 0) return '↓ ' + Math.abs(value).toFixed(1) + '%';
-        return '→ ' + Math.abs(value).toFixed(1) + '%';
-      };
-
       const getResetColor = (delta) => {
         if (delta > 0) return 'rgb(248, 180, 160)';
         if (delta < 0) return 'rgb(77, 214, 74)';
@@ -136,11 +143,11 @@ function buildReportHTML(todayStats, yesterdayStats) {
         <tr>
           <td class="col-table">${table}</td>
           <td>${today.firstAttemptTotal > 0 ? today.firstAttemptCorrect + ' / ' + today.firstAttemptTotal : '— / —'}</td>
-          <td>${today.firstAttemptPct > 0 ? today.firstAttemptPct + '%' : '—'}</td>
-          <td class="heatmap-improvement" style="background-color: ${getColor(firstImprovement)};">${formatImprovement(firstImprovement)}</td>
+          <td>${today.firstAttemptTotal > 0 ? today.firstAttemptPct + '%' : '—'}</td>
+          <td class="heatmap-improvement" style="background-color: ${first.color};">${first.text}</td>
           <td>${today.secondAttemptTotal > 0 ? today.secondAttemptCorrect + ' / ' + today.secondAttemptTotal : '— / —'}</td>
-          <td>${today.secondAttemptPct > 0 ? today.secondAttemptPct + '%' : '—'}</td>
-          <td class="heatmap-improvement" style="background-color: ${getColor(secondImprovement)};">${formatImprovement(secondImprovement)}</td>
+          <td>${today.secondAttemptTotal > 0 ? today.secondAttemptPct + '%' : '—'}</td>
+          <td class="heatmap-improvement" style="background-color: ${second.color};">${second.text}</td>
           <td>${today.resets || 0}</td>
           <td class="heatmap-reset-improvement" style="background-color: ${getResetColor(resetImprovement)};">${resetImprovement > 0 ? '↑ ' + resetImprovement + ' more' : resetImprovement < 0 ? '↓ ' + Math.abs(resetImprovement) + ' fewer' : '→ Same'}</td>
         </tr>
