@@ -623,6 +623,34 @@
   // Migration map from old mode names so existing saved progress doesn't get wiped
   const MODE_MIGRATE = { classic: 'snail', sonic: 'dog', supersonic: 'cheetah' };
 
+  // Enabled-modes settings storage (declared up here because getEnabledModes
+  // is called during boot, long before the Settings UI section below).
+  const MODES_STORAGE_KEY = 'mp_modes_settings';
+  const defaultModes = { multiplication: ['snail', 'dog', 'cheetah'], division: ['snail', 'dog', 'cheetah'] };
+
+  // Modes enabled in Settings for the CURRENT operation, in progression order.
+  // ALL game logic that picks a mode must go through these helpers — the kid
+  // must never be placed in a mode that Settings has turned off.
+  function enabledModeOrder() {
+    const em = getEnabledModes();
+    const opModes = (operation === 'division' ? em.division : em.multiplication) || [];
+    const order = MODE_ORDER.filter(function (m) { return opModes.indexOf(m) !== -1; });
+    return order.length ? order : MODE_ORDER.slice();
+  }
+  function firstEnabledMode() { return enabledModeOrder()[0]; }
+  // Next enabled mode after `mode` in the progression, or null if `mode` is the last enabled one.
+  function nextEnabledMode(mode) {
+    const order = enabledModeOrder();
+    for (let i = 0; i < order.length; i++) {
+      if (MODE_ORDER.indexOf(order[i]) > MODE_ORDER.indexOf(mode)) return order[i];
+    }
+    return null;
+  }
+  // Saved/remembered modes may reference a mode that was later disabled — clamp.
+  function clampToEnabled(mode) {
+    return enabledModeOrder().indexOf(mode) !== -1 ? mode : firstEnabledMode();
+  }
+
   const opToggleEl    = document.getElementById('op-toggle');
   const titleEl       = document.getElementById('title');
   const tablePickerEl = document.getElementById('table-picker');
@@ -898,13 +926,16 @@
       tablePoints = {};
       pointsEl.textContent = points;
       currentTable = 2; // Always start at Table 2 after reset
-      currentMode = 'snail'; // Start with Snail mode
+      currentMode = firstEnabledMode(); // First mode enabled in Settings
       try { localStorage.setItem(DAILY_RESET_KEY, today); } catch (e) {}
       // Post event for daily reset
       if (typeof postEvent === 'function') postEvent({ type: 'daily-reset', points: points });
     }
   }
   checkAndApplyDailyReset();
+
+  // Settings may have changed since the state was saved — never resume into a disabled mode.
+  currentMode = clampToEnabled(currentMode);
 
   // Check for daily reset every minute (so resets happen within ~1 min if kid is playing past midnight)
   setInterval(checkAndApplyDailyReset, 60000);
@@ -1386,7 +1417,9 @@
 
     const completedMode = currentMode;
     const completedTable = currentTable;
-    const isLastMode = MODE_ORDER.indexOf(completedMode) === MODE_ORDER.length - 1;
+    // "Last mode" = last ENABLED mode (Settings) — e.g. with Cheetah-only,
+    // completing Cheetah advances straight to the next table.
+    const isLastMode = nextEnabledMode(completedMode) === null;
 
     // Cheetah is the last mode. Completing it = the table is "mastered" — lock
     // this table's Robucks to exactly 100 (cap over-earned or top up under-earned).
@@ -1415,8 +1448,8 @@
     let nextMode, nextTable, screenMsg, spokenMsg;
 
     if (!isLastMode) {
-      // Advance to next mode on the same table
-      nextMode = MODE_ORDER[MODE_ORDER.indexOf(completedMode) + 1];
+      // Advance to next ENABLED mode on the same table
+      nextMode = nextEnabledMode(completedMode);
       nextTable = completedTable;
       const nextSecs = MODE_SECONDS[nextMode];
       screenMsg = `🎉 10/10 in ${MODE_LABEL[completedMode]} for the ${completedTable} table! EXCELLENT — now try ${MODE_LABEL[nextMode]}.`;
@@ -1425,7 +1458,15 @@
       // Final mode done → advance to next table back to first mode
       const wrapAround = completedTable >= 10;
       nextTable = wrapAround ? 2 : completedTable + 1;
-      nextMode = MODE_ORDER[0];
+      // Skip tables that are already done (100 Robucks committed) — the kid
+      // can't revisit them until the full cycle resets. Note: on wrapAround
+      // tablePoints is cleared below, so every table unlocks again.
+      if (!wrapAround) {
+        for (let hops = 0; hops < 9 && isTableDone(nextTable); hops++) {
+          nextTable = nextTable >= 10 ? 2 : nextTable + 1;
+        }
+      }
+      nextMode = firstEnabledMode();
       screenMsg = wrapAround
         ? `🎉 10/10 in ${MODE_LABEL[completedMode]}! EXCELLENT — you finished all 10 tables! 🏆 Robucks reset to 0. Starting over from Table 2!`
         : `🎉 10/10 in ${MODE_LABEL[completedMode]} for the ${completedTable} table! EXCELLENT — moving to the ${nextTable} table.`;
@@ -1459,7 +1500,7 @@
       tablePoints = {};
       pointsEl.textContent = points;
       currentTable = 2;
-      currentMode = 'snail';
+      currentMode = firstEnabledMode();
       tableStreak = 0;
       cheetahFailures = 0;
       praiseShownAt.clear();
@@ -1749,21 +1790,29 @@
       const lossLine = lostPoints > 0
         ? ` You lost the ${lostPoints} Robucks you would have earned this attempt.`
         : '';
-      const screenMsg = `🐌 Cheetah Mode is tough! Going all the way back to Snail Mode for Table ${currentTable}.${lossLine} Work your way back up through Dog and Cheetah Modes.`;
-      const spokenMsg = `That's two strikes in cheetah mode. Going back to snail mode for the ${currentTable} table.${lostPoints > 0 ? ' You lost the ' + lostPoints + ' Robucks you would have earned this attempt.' : ''} Work your way back up.`;
+      // Demote to the first ENABLED mode. With Cheetah-only in Settings there
+      // is nowhere lower to go — the demotion becomes a Cheetah restart.
+      const demoteMode = firstEnabledMode();
+      const restartOnly = demoteMode === 'cheetah';
+      const screenMsg = restartOnly
+        ? `🐆 Two strikes! Cheetah Mode for Table ${currentTable} is resetting to the start.${lossLine} You've got this — try again!`
+        : `🐌 Cheetah Mode is tough! Going all the way back to ${MODE_LABEL[demoteMode]} for Table ${currentTable}.${lossLine} Work your way back up.`;
+      const spokenMsg = restartOnly
+        ? `That's two strikes in cheetah mode. The ${currentTable} table is resetting to the start.${lostPoints > 0 ? ' You lost the ' + lostPoints + ' Robucks you would have earned this attempt.' : ''} Try again, you've got this!`
+        : `That's two strikes in cheetah mode. Going back to ${MODE_SPOKEN[demoteMode]} for the ${currentTable} table.${lostPoints > 0 ? ' You lost the ' + lostPoints + ' Robucks you would have earned this attempt.' : ''} Work your way back up.`;
       praiseEl.textContent = screenMsg;
-      if (typeof postEvent === 'function') postEvent({ type: 'cheetah-demote', op: operation, table: currentTable, toMode: 'snail', pointsLost: lostPoints });
+      if (typeof postEvent === 'function') postEvent({ type: 'cheetah-demote', op: operation, table: currentTable, toMode: demoteMode, pointsLost: lostPoints });
       // Clear the frozen Cheetah slot for this table — that run is over.
       // Snail/Dog frozen slots stay (kid may have progress there to resume).
       if (combined[operation] && combined[operation].frozenModeStates && combined[operation].frozenModeStates[currentTable]) {
         delete combined[operation].frozenModeStates[currentTable].cheetah;
       }
-      // Kid is being sent to Snail — record that as the sticky last mode.
+      // Record the demotion target as the sticky last mode for this table.
       if (combined[operation]) {
         if (!combined[operation].lastModePerTable) combined[operation].lastModePerTable = {};
-        combined[operation].lastModePerTable[currentTable] = 'snail';
+        combined[operation].lastModePerTable[currentTable] = demoteMode;
       }
-      currentMode = 'snail';
+      currentMode = demoteMode;
       cheetahFailures = 0;
       bag = [];
       updateModeUI();
@@ -1839,6 +1888,8 @@
     operation = newOp;
     combined.op = operation;
     applyLive(combined[operation]);
+    // Each op has its own enabled-modes setting — never resume into a disabled mode.
+    currentMode = clampToEnabled(currentMode);
     saveState();
     if (typeof postEvent === 'function') postEvent({ type: 'switch-op', op: operation });
     // Cancel any in-flight timer / speech (timer restarts inside newProblem)
@@ -1867,25 +1918,38 @@
   });
 
   // ----- Table + Mode pickers -----
-  function updateTablePickerUI() {
-    // Enforce sequential progression: find the highest completed table
-    // (tablePoints[t] >= 100), then allow access to 2 through highestCompleted + 1.
+  // A table is "done" once its 100 Robucks are committed (Cheetah mastered).
+  // Done tables are LOCKED — no going back until all 10 are finished
+  // (tablePoints resets on full-cycle completion and on the nightly reset).
+  function isTableDone(t) {
+    return (tablePoints[t] || 0) >= 100;
+  }
+  function isTableAccessible(t) {
+    if (t < 2 || t > 10) return false;
+    if (t === currentTable) return true;      // never lock the kid out of where they are
+    if (isTableDone(t)) return false;         // completed → locked until the cycle resets
+    // Forward gate: can't skip ahead past the next uncompleted table.
     let highestCompleted = 1; // Table 1 is always done (freebie)
-    for (let t = 2; t <= 10; t++) {
-      if ((tablePoints[t] || 0) >= 100) highestCompleted = t;
+    for (let k = 2; k <= 10; k++) {
+      if (isTableDone(k)) highestCompleted = k;
     }
-    const maxAccessible = Math.min(highestCompleted + 1, 10);
+    return t <= Math.min(highestCompleted + 1, 10);
+  }
 
+  function updateTablePickerUI() {
     const btns = tablePickerEl.querySelectorAll('.picker-btn');
     for (let i = 0; i < btns.length; i++) {
       const t = Number(btns[i].getAttribute('data-table'));
       const isActive = t === currentTable;
-      const isAccessible = t >= 2 && t <= maxAccessible;
+      const done = isTableDone(t) && !isActive;
+      const isAccessible = isTableAccessible(t);
       btns[i].classList.toggle('active', isActive);
       btns[i].classList.toggle('disabled', !isAccessible);
+      btns[i].textContent = done ? t + ' ✓' : String(t);
       btns[i].style.opacity = isAccessible ? '1' : '0.4';
       btns[i].style.pointerEvents = isAccessible ? 'auto' : 'none';
       btns[i].style.cursor = isAccessible ? 'pointer' : 'not-allowed';
+      btns[i].title = done ? 'Done! Locked until all 10 tables are finished.' : '';
     }
   }
 
@@ -1943,8 +2007,8 @@
     saveState();
     if (typeof postEvent === 'function') {
       postEvent({ type: 'switch-table-mode', op: operation, table: currentTable, mode: currentMode });
-      // Post table-start event only when starting a fresh table (Snail mode = first mode, not resumed)
-      if (newMode === 'snail' && !resumed) {
+      // Post table-start event only when starting a fresh table (first enabled mode, not resumed)
+      if (newMode === firstEnabledMode() && !resumed) {
         postEvent({ type: 'table-start', op: operation, table: newTable });
       }
     }
@@ -1966,12 +2030,24 @@
     const btn = e.target.closest && e.target.closest('.picker-btn');
     if (!btn) return;
     const t = Number(btn.getAttribute('data-table'));
+    // Locked tables (done, or gated ahead) are not clickable. pointer-events
+    // already blocks most clicks; this guard catches the rest.
+    if (!isTableAccessible(t)) {
+      if (isTableDone(t)) {
+        feedbackEl.textContent = '🔒 Table ' + t + ' is done! Finish all 10 tables to unlock it again.';
+        feedbackEl.className = 'feedback wrong';
+        setTimeout(function () { if (feedbackEl.textContent.indexOf('🔒') === 0) feedbackEl.textContent = ''; }, 2500);
+      }
+      return;
+    }
     // Sticky mode per table: if the kid was previously on this table in Dog
     // or Cheetah, take them back there (with the frozen problem + wall-clock
     // timer). Only default to Snail for tables they've never touched.
     const opState = combined[operation];
     const remembered = (opState && opState.lastModePerTable && opState.lastModePerTable[t]);
-    const targetMode = (MODE_ORDER.indexOf(remembered) !== -1) ? remembered : 'snail';
+    // Sticky mode, clamped to the modes enabled in Settings: unknown tables
+    // (and remembered modes that got disabled) land on the first enabled mode.
+    const targetMode = clampToEnabled(remembered);
     jumpTo(t, targetMode);
   });
 
@@ -1983,9 +2059,8 @@
   });
 
   // ----- Settings Management -----
-  const MODES_STORAGE_KEY = 'mp_modes_settings';
-  const defaultModes = { multiplication: ['snail', 'dog', 'cheetah'], division: ['snail', 'dog', 'cheetah'] };
-
+  // (MODES_STORAGE_KEY / defaultModes are declared near MODE_ORDER at the top,
+  // because getEnabledModes runs during boot.)
   function getEnabledModes() {
     try {
       const saved = localStorage.getItem(MODES_STORAGE_KEY);
@@ -2058,6 +2133,11 @@
     saveModes(modes);
     filterModePickerButtons();
     if (settingsOverlay) settingsOverlay.classList.add('hidden');
+    // If the mode the kid is in right now just got disabled, move them to the
+    // first enabled mode immediately (jumpTo refreshes UI + problem + save).
+    if (enabledModeOrder().indexOf(currentMode) === -1) {
+      jumpTo(currentTable, firstEnabledMode());
+    }
   });
 
   // ----- Login + server sync -----
