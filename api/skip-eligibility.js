@@ -2,13 +2,21 @@
 //
 // A table is skip-eligible when its 3 most recent QUALIFYING days were all
 // perfect. Per (op, table), a day with any Cheetah activity is:
-//   - perfect:  zero cheetah-strike events AND a cheetah mode-complete that day
+//   - perfect:  zero imperfections AND a cheetah mode-complete that day
 //               (every problem right on the very first attempt, table finished)
-//   - imperfect: any cheetah-strike event that day (breaks the streak)
-//   - neutral:  played but no strikes and no completion (day ended mid-table —
-//               ignored, neither extends nor breaks the streak)
+//   - imperfect: any imperfection that day (breaks the streak)
+//   - neutral:  played but no imperfections and no completion (day ended
+//               mid-table — ignored, neither extends nor breaks the streak)
 // Days don't have to be consecutive calendar days — only the last 3 qualifying
 // days matter.
+//
+// An "imperfection" is ANY evidence of a first-try miss, across all logging
+// eras (cheetah-strike events only started 2026-07-06; before that only raw
+// answer events exist):
+//   - a cheetah-strike event
+//   - a cheetah wrong/timeout answer event
+//   - a cheetah correct with firstAttempt === false (a 2nd-try success
+//     implies the 1st try missed)
 
 const REDIS_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -32,7 +40,7 @@ function ptDayKey(ts) {
 }
 
 export function computeEligibility(allEvents) {
-  // days[op][table][dayKey] = { strikes, completed, played }
+  // days[op][table][dayKey] = { imperfections, completed, played }
   const days = { multiplication: {}, division: {} };
 
   for (const e of allEvents) {
@@ -41,16 +49,18 @@ export function computeEligibility(allEvents) {
     if (typeof t !== 'number' || t < 2 || t > 10) continue;
 
     const isStrike = e.type === 'cheetah-strike';
+    const isCheetahMiss = (e.type === 'wrong' || e.type === 'timeout') && e.mode === 'cheetah';
+    const isSecondTryCorrect = e.type === 'correct' && e.mode === 'cheetah' && e.firstAttempt === false;
     const isCheetahAnswer = (e.type === 'correct' || e.type === 'wrong' || e.type === 'timeout') && e.mode === 'cheetah';
     const isCheetahComplete = e.type === 'mode-complete' && e.mode === 'cheetah';
     if (!isStrike && !isCheetahAnswer && !isCheetahComplete) continue;
 
     const day = ptDayKey(e.ts);
     if (!days[op][t]) days[op][t] = {};
-    if (!days[op][t][day]) days[op][t][day] = { strikes: 0, completed: false, played: false };
+    if (!days[op][t][day]) days[op][t][day] = { imperfections: 0, completed: false, played: false };
     const d = days[op][t][day];
     d.played = true;
-    if (isStrike) d.strikes++;
+    if (isStrike || isCheetahMiss || isSecondTryCorrect) d.imperfections++;
     if (isCheetahComplete) d.completed = true;
   }
 
@@ -62,13 +72,13 @@ export function computeEligibility(allEvents) {
       const qualifying = Object.keys(perTable)
         .filter(day => {
           const d = perTable[day];
-          return d.strikes > 0 || d.completed; // neutral days drop out
+          return d.imperfections > 0 || d.completed; // neutral days drop out
         })
         .sort()
         .reverse();
       const last3 = qualifying.slice(0, 3);
       eligibility[op][t] = last3.length === 3 &&
-        last3.every(day => perTable[day].strikes === 0 && perTable[day].completed);
+        last3.every(day => perTable[day].imperfections === 0 && perTable[day].completed);
     }
   }
   return eligibility;
