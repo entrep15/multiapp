@@ -237,6 +237,22 @@
     gap: 4px;
     justify-content: center;
   }
+  .skip-btn {
+    display: block;
+    margin: 10px auto 0;
+    background: linear-gradient(90deg, #f6ad0f, #f68b0f);
+    color: #fff;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(246, 139, 15, 0.4);
+    transition: transform 0.1s;
+  }
+  .skip-btn:active { transform: scale(0.96); }
+  .skip-btn.hidden { display: none; }
   .progress-cell {
     flex: 1;
     max-width: 32px;
@@ -514,6 +530,7 @@
         <div class="progress-cell"></div>
         <div class="progress-cell"></div>
       </div>
+      <button type="button" id="skip-btn" class="skip-btn hidden">⏭️ Skip this table — mastered 3 days in a row!</button>
     </div>
     <div class="character" id="character"></div>
     <div class="problem" id="problem">— × —</div>
@@ -675,6 +692,10 @@
                                    // (rolled back on any exit before 10/10 completion — closes several exploits)
   let operation = 'multiplication';// 'multiplication' | 'division'
   let tablePoints = {};            // { tableNum: pointsEarnedOnThatTable } — for demotion refund
+  // Per-table skip rights, fetched from /api/skip-eligibility after login:
+  // { multiplication: { 2: bool, ... }, division: { ... } }. A table earns a
+  // Skip button after 3 qualifying days in a row of 100% first-attempt play.
+  let skipEligibility = { multiplication: {}, division: {} };
 
   // ----- Persistence (localStorage) -----
   const STORAGE_KEY = 'mp.v3';
@@ -1192,6 +1213,124 @@
     modeLabelEl.className = 'mode-label ' + currentMode;
     document.body.classList.remove('dog', 'cheetah');
     if (currentMode !== 'snail') document.body.classList.add(currentMode);
+    updateSkipButtonUI();
+  }
+
+  // Show the Skip button only when the CURRENT table has earned it
+  // (3 qualifying days in a row at 100% first-attempt) and isn't already done.
+  function updateSkipButtonUI() {
+    const btn = document.getElementById('skip-btn');
+    if (!btn) return;
+    const perOp = skipEligibility[operation] || {};
+    const show = !!perOp[currentTable] && !isTableDone(currentTable);
+    btn.classList.toggle('hidden', !show);
+  }
+
+  function fetchSkipEligibility() {
+    if (!userPin) return;
+    try {
+      fetch('/api/skip-eligibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: userPin })
+      }).then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
+          if (data && data.ok && data.eligibility) {
+            skipEligibility = data.eligibility;
+            updateSkipButtonUI();
+          }
+        }).catch(function () { /* offline ok — button just stays hidden */ });
+    } catch (e) { /* ignore */ }
+  }
+
+  // Skip = the table counts as mastered: commit its 100 Robucks, mark it done
+  // (locks it like a normal completion), and move on to the next table.
+  function skipTable() {
+    const t = currentTable;
+    const perOp = skipEligibility[operation] || {};
+    if (!perOp[t] || isTableDone(t)) return;
+
+    stopTimer();
+    if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+
+    const alreadyCommitted = tablePoints[t] || 0;
+    const topUp = Math.max(0, 100 - alreadyCommitted);
+    tablePoints[t] = alreadyCommitted + topUp;
+    points = Math.max(0, points + topUp);
+    cheetahRunEarned = 0;
+    pointsEl.textContent = points;
+    if (combined[operation] && combined[operation].frozenModeStates && combined[operation].frozenModeStates[t]) {
+      delete combined[operation].frozenModeStates[t];
+    }
+    if (typeof postEvent === 'function') postEvent({ type: 'table-skip', op: operation, table: t, mode: 'cheetah' });
+
+    let advanced = false;
+
+    // Reached the 1000-Robucks goal via skip → same celebration/reset as completeStage
+    if (points >= 1000) {
+      praiseEl.textContent = `🎉 CONGRATULATIONS! 🎉 You earned all 1000 Robucks! You are a math superstar! 🌟 Starting over from Table 2...`;
+      for (let i = 0; i < 5; i++) setTimeout(() => fireworks(), i * 200);
+      points = 0;
+      tablePoints = {};
+      pointsEl.textContent = points;
+      currentTable = 2;
+      currentMode = firstEnabledMode();
+      tableStreak = 0;
+      cheetahFailures = 0;
+      praiseShownAt.clear();
+      bag = [];
+      if (combined[operation]) {
+        if (!combined[operation].lastModePerTable) combined[operation].lastModePerTable = {};
+        combined[operation].lastModePerTable[currentTable] = currentMode;
+      }
+      saveState();
+      setTimeout(() => {
+        if (advanced) return;
+        advanced = true;
+        tableNumEl.textContent = currentTable;
+        updateTablePickerUI();
+        updateModePickerUI();
+        renderProgress();
+        updateModeUI();
+        praiseEl.textContent = '';
+        newProblem();
+      }, 5000);
+      return;
+    }
+
+    // Advance to the next not-yet-done table (same skip-over rule as completeStage)
+    let nextTable = t >= 10 ? 2 : t + 1;
+    for (let hops = 0; hops < 9 && isTableDone(nextTable); hops++) {
+      nextTable = nextTable >= 10 ? 2 : nextTable + 1;
+    }
+    praiseEl.textContent = `⏭️ Table ${t} skipped — you've mastered it 3 days in a row! Moving to the ${nextTable} table.`;
+    fireworks();
+
+    const advance = () => {
+      if (advanced) return;
+      advanced = true;
+      currentTable = nextTable;
+      currentMode = firstEnabledMode();
+      tableStreak = 0;
+      cheetahFailures = 0;
+      praiseShownAt.clear();
+      bag = [];
+      if (combined[operation]) {
+        if (!combined[operation].lastModePerTable) combined[operation].lastModePerTable = {};
+        combined[operation].lastModePerTable[currentTable] = currentMode;
+      }
+      saveState();
+      tableNumEl.textContent = currentTable;
+      updateTablePickerUI();
+      updateModePickerUI();
+      renderProgress();
+      updateModeUI();
+      praiseEl.textContent = '';
+      feedbackEl.textContent = '';
+      newProblem();
+    };
+    saveState();
+    speakThenAdvance(`Table ${t} skipped. You've mastered it three days in a row! Moving to the ${nextTable} table.`, advance);
   }
 
   function stopTimer() {
@@ -2058,6 +2197,11 @@
     jumpTo(currentTable, m);
   });
 
+  (function () {
+    const skipBtn = document.getElementById('skip-btn');
+    if (skipBtn) skipBtn.addEventListener('click', skipTable);
+  })();
+
   // ----- Settings Management -----
   // (MODES_STORAGE_KEY / defaultModes are declared near MODE_ORDER at the top,
   // because getEnabledModes runs during boot.)
@@ -2181,6 +2325,7 @@
         // Show the current problem (or a fresh one if none is pending)
         newProblem();
         postEvent({ type: 'session-start' });
+        fetchSkipEligibility();
       } else if (res.status === 401) {
         loginErrorEl.textContent = 'Oops! Wrong code. Try again.';
         loginPinEl.value = '';
