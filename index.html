@@ -648,13 +648,14 @@
   // Modes enabled in Settings for the CURRENT operation, in progression order.
   // ALL game logic that picks a mode must go through these helpers — the kid
   // must never be placed in a mode that Settings has turned off.
-  function enabledModeOrder() {
+  function enabledModeOrder(opOverride) {
     const em = getEnabledModes();
-    const opModes = (operation === 'division' ? em.division : em.multiplication) || [];
+    const op = opOverride || operation;
+    const opModes = (op === 'division' ? em.division : em.multiplication) || [];
     const order = MODE_ORDER.filter(function (m) { return opModes.indexOf(m) !== -1; });
     return order.length ? order : MODE_ORDER.slice();
   }
-  function firstEnabledMode() { return enabledModeOrder()[0]; }
+  function firstEnabledMode(opOverride) { return enabledModeOrder(opOverride)[0]; }
   // Next enabled mode after `mode` in the progression, or null if `mode` is the last enabled one.
   function nextEnabledMode(mode) {
     const order = enabledModeOrder();
@@ -815,6 +816,20 @@
     };
   }
 
+  // Robucks are DERIVED, never stored independently: 100 per committed table,
+  // including Table 1's automatic freebie. This is the single source of truth —
+  // it makes a stale/corrupt saved `points` value self-heal on every load, and
+  // the 1000 celebration can only fire when tables 1-10 are ALL genuinely
+  // committed. (Root cause of the 2026-07-21 early-celebration incident: the
+  // daily reset kept points=100 but dropped the tablePoints[1] marker, so the
+  // next reload's freebie top-up double-counted the baseline to 200.)
+  function recomputePoints() {
+    let sum = 0;
+    for (const k in tablePoints) sum += (tablePoints[k] || 0);
+    points = sum;
+    if (pointsEl) pointsEl.textContent = points;
+  }
+
   function applyLive(s) {
     points          = s.points;
     currentTable    = s.currentTable;
@@ -825,11 +840,10 @@
     tablePoints     = (s.tablePoints && typeof s.tablePoints === 'object') ? Object.assign({}, s.tablePoints) : {};
     bag             = Array.isArray(s.bag) ? s.bag.slice() : [];
     // Table 1 freebie: 100 Robucks credited automatically (the kid never sees
-    // a Table 1 question because the game starts at Table 2). Idempotent.
-    if (!tablePoints[1]) {
-      tablePoints[1] = 100;
-      points += 100;
-    }
+    // a Table 1 question because the game starts at Table 2). Idempotent —
+    // recomputePoints() derives the total, so this can never double-count.
+    tablePoints[1] = 100;
+    recomputePoints();
     if (s.currentProblem) {
       a = s.currentProblem.a;
       b = s.currentProblem.b;
@@ -867,6 +881,8 @@
           }
           if (parsed.multiplication) combined.multiplication = sanitizeGameState(parsed.multiplication);
           if (parsed.division)       combined.division       = sanitizeGameState(parsed.division);
+          // Daily-reset marker travels WITH the state (see checkAndApplyDailyReset)
+          if (typeof parsed.lastResetDayPT === 'string') combined.lastResetDayPT = parsed.lastResetDayPT;
         }
       } else {
         // First time on v3 — migrate from older single-game v2 key if present
@@ -929,8 +945,11 @@
   applyLive(combined[operation]);
 
   // Daily reset at 11:59 PM PT (6:59 AM UTC next day)
-  // Check if we've crossed into a new day and reset points to 100 if so.
-  const DAILY_RESET_KEY = 'mp_daily_reset_pt';
+  // Check if we've crossed into a new day and reset the Robucks if so.
+  // The marker lives INSIDE the saved state (combined.lastResetDayPT), not in a
+  // separate localStorage key — a separate key can go out of sync with the
+  // state when a stale tab's unload-save clobbers a newer save. Carrying the
+  // marker with the state means clobbered state = re-reset on next check.
   function getPTDate() {
     const now = new Date();
     const ptTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
@@ -938,20 +957,30 @@
   }
   function checkAndApplyDailyReset() {
     const today = getPTDate();
-    let lastResetDate = '';
-    try { lastResetDate = localStorage.getItem(DAILY_RESET_KEY) || ''; } catch (e) {}
+    if (combined.lastResetDayPT === today) return;
 
-    if (lastResetDate !== today) {
-      // New day in PT timezone — reset points back to 100 and tablePoints to empty
-      points = 100;
-      tablePoints = {};
-      pointsEl.textContent = points;
-      currentTable = 2; // Always start at Table 2 after reset
-      currentMode = firstEnabledMode(); // First mode enabled in Settings
-      try { localStorage.setItem(DAILY_RESET_KEY, today); } catch (e) {}
-      // Post event for daily reset
-      if (typeof postEvent === 'function') postEvent({ type: 'daily-reset', points: points });
+    // New day in PT — reset BOTH ops to the day's baseline: Table 1's free 100
+    // Robucks, everything else unearned, start back at Table 2.
+    for (const opName of ['multiplication', 'division']) {
+      const slot = combined[opName];
+      if (!slot) continue;
+      slot.tablePoints = { 1: 100 };
+      slot.points = 100;
+      slot.currentTable = 2;
+      slot.currentMode = firstEnabledMode(opName);
+      slot.tableStreak = 0;
+      slot.cheetahFailures = 0;
+      slot.cheetahRunEarned = 0;
+      slot.frozenModeStates = {};
+      slot.currentProblem = null;
+      slot.bag = [];
     }
+    combined.lastResetDayPT = today;
+    // Re-apply the current op so the live vars pick up the reset values.
+    applyLive(combined[operation]);
+    saveState();
+    // Post event for daily reset (no-ops before login)
+    if (typeof postEvent === 'function') postEvent({ type: 'daily-reset', points: points });
   }
   checkAndApplyDailyReset();
 
@@ -1253,12 +1282,9 @@
     stopTimer();
     if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
 
-    const alreadyCommitted = tablePoints[t] || 0;
-    const topUp = Math.max(0, 100 - alreadyCommitted);
-    tablePoints[t] = alreadyCommitted + topUp;
-    points = Math.max(0, points + topUp);
+    tablePoints[t] = 100;
+    recomputePoints();
     cheetahRunEarned = 0;
-    pointsEl.textContent = points;
     if (combined[operation] && combined[operation].frozenModeStates && combined[operation].frozenModeStates[t]) {
       delete combined[operation].frozenModeStates[t];
     }
@@ -1270,9 +1296,8 @@
     if (points >= 1000) {
       praiseEl.textContent = `🎉 CONGRATULATIONS! 🎉 You earned all 1000 Robucks! You are a math superstar! 🌟 Starting over from Table 2...`;
       for (let i = 0; i < 5; i++) setTimeout(() => fireworks(), i * 200);
-      points = 0;
-      tablePoints = {};
-      pointsEl.textContent = points;
+      tablePoints = { 1: 100 };
+      recomputePoints();
       currentTable = 2;
       currentMode = firstEnabledMode();
       tableStreak = 0;
@@ -1564,15 +1589,12 @@
     // this table's Robucks to exactly 100 (cap over-earned or top up under-earned).
     let reachedGoal = false;
     if (completedMode === 'cheetah') {
-      // COMMIT the provisional Robucks. Cap at 100 per table so re-completions
-      // don't stack. Prior Robucks on this table (from an earlier completion)
-      // stay locked in — we only ADD what tops it up to 100.
-      const alreadyCommitted = tablePoints[completedTable] || 0;
-      const topUp = Math.max(0, 100 - alreadyCommitted);
-      tablePoints[completedTable] = alreadyCommitted + topUp;
-      points = Math.max(0, points + topUp);
+      // COMMIT the table at exactly 100 and re-derive the total. Re-completions
+      // can't stack and a drifted `points` value can't survive: the total is
+      // always 100 × committed tables (including Table 1's freebie).
+      tablePoints[completedTable] = 100;
+      recomputePoints();
       cheetahRunEarned = 0;
-      pointsEl.textContent = points;
       // Clear any stale frozen Cheetah slot for this table (we just mastered it).
       // Snail/Dog frozen slots for the same table stay untouched.
       if (combined[operation] && combined[operation].frozenModeStates && combined[operation].frozenModeStates[completedTable]) {
@@ -1607,17 +1629,17 @@
       }
       nextMode = firstEnabledMode();
       screenMsg = wrapAround
-        ? `🎉 10/10 in ${MODE_LABEL[completedMode]}! EXCELLENT — you finished all 10 tables! 🏆 Robucks reset to 0. Starting over from Table 2!`
+        ? `🎉 10/10 in ${MODE_LABEL[completedMode]}! EXCELLENT — you finished all 10 tables! 🏆 Robucks reset to 100. Starting over from Table 2!`
         : `🎉 10/10 in ${MODE_LABEL[completedMode]} for the ${completedTable} table! EXCELLENT — moving to the ${nextTable} table.`;
       spokenMsg = wrapAround
-        ? `You have reached 10 out of 10 in ${MODE_SPOKEN[completedMode]} for the ${completedTable} table. Excellent! You finished all 10 tables! Your Robucks have been reset to zero. Let's start over from Table 2.`
+        ? `You have reached 10 out of 10 in ${MODE_SPOKEN[completedMode]} for the ${completedTable} table. Excellent! You finished all 10 tables! Your Robucks have been reset. Let's start over from Table 2.`
         : `You have reached 10 out of 10 in ${MODE_SPOKEN[completedMode]} for the ${completedTable} table. Excellent! Let's move to the ${nextTable} table.`;
 
-      // Reset Robucks when completing the full cycle (all 10 tables)
+      // Reset Robucks when completing the full cycle (all 10 tables) —
+      // back to the day baseline (Table 1's free 100)
       if (wrapAround) {
-        points = 0;
-        tablePoints = {};
-        pointsEl.textContent = points;
+        tablePoints = { 1: 100 };
+        recomputePoints();
         // Persist the reset immediately
         saveState();
       }
@@ -1635,9 +1657,8 @@
         if (isLastMode) postEvent({ type: 'table-complete', op: operation, table: completedTable });
       }
       // IMMEDIATELY reset and save so it survives refresh/navigation before auto-advance
-      points = 0;
-      tablePoints = {};
-      pointsEl.textContent = points;
+      tablePoints = { 1: 100 };
+      recomputePoints();
       currentTable = 2;
       currentMode = firstEnabledMode();
       tableStreak = 0;
