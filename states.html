@@ -751,13 +751,38 @@
     });
 
     popEl.classList.add('open');
-    const pw = 230, ph = popEl.offsetHeight || 190;
-    let x = cx + 14, y = cy - ph / 2;
-    if (x + pw > window.innerWidth - 8) x = cx - pw - 14;
-    if (x < 8) x = 8;
-    y = Math.max(8, Math.min(y, window.innerHeight - ph - 8));
-    popEl.style.left = x + 'px';
-    popEl.style.top = y + 'px';
+    positionPopup(code);
+  }
+
+  // Place the popup beside the state WITHOUT covering it: try right, left,
+  // below, then above of the state's bounding box; take the first position
+  // that fits on screen and doesn't overlap the shape being asked about.
+  function positionPopup(code) {
+    const sr = statePaths[code].getBoundingClientRect();
+    const pw = popEl.offsetWidth || 230, ph = popEl.offsetHeight || 190;
+    const m = 12;
+    const W = window.innerWidth, H = window.innerHeight;
+    const scx = sr.left + sr.width / 2, scy = sr.top + sr.height / 2;
+    const clamp = function (v, lo, hi) { return Math.max(lo, Math.min(v, hi)); };
+    const candidates = [
+      { x: sr.right + m,     y: scy - ph / 2 },   // right of the state
+      { x: sr.left - m - pw, y: scy - ph / 2 },   // left
+      { x: scx - pw / 2,     y: sr.bottom + m },  // below
+      { x: scx - pw / 2,     y: sr.top - m - ph } // above
+    ];
+    const overlapsState = function (x, y) {
+      return x < sr.right + 4 && x + pw > sr.left - 4 &&
+             y < sr.bottom + 4 && y + ph > sr.top - 4;
+    };
+    let best = null;
+    for (let i = 0; i < candidates.length; i++) {
+      const x = clamp(candidates[i].x, 8, W - pw - 8);
+      const y = clamp(candidates[i].y, 8, H - ph - 8);
+      if (!overlapsState(x, y)) { best = { x: x, y: y }; break; }
+      if (!best) best = { x: x, y: y }; // fallback if every side overlaps
+    }
+    popEl.style.left = best.x + 'px';
+    popEl.style.top = best.y + 'px';
   }
 
   function closeQuiz() {
