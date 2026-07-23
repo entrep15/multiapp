@@ -47,6 +47,8 @@
     display: block;
   }
   .op-btn:hover { background: rgba(118, 75, 162, 0.08); }
+  .op-btn { white-space: nowrap; }
+  a.op-btn { text-decoration: none; text-align: center; }
   .op-btn.active {
     background: #764ba2;
     color: #fff;
@@ -486,6 +488,7 @@
     <div class="op-toggle" id="op-toggle">
       <button type="button" class="op-btn active" data-op="multiplication">× Multiplication</button>
       <button type="button" class="op-btn" data-op="division">÷ Division</button>
+      <a class="op-btn" href="/states.html">🗺️ Maps</a>
     </div>
     <div class="picker-group" id="table-picker" aria-label="Pick a table">
       <button type="button" class="picker-btn" data-table="2">2</button>
@@ -506,7 +509,6 @@
     <div class="header">
       <div style="display: flex; gap: 12px; align-items: center;">
         <button class="settings-btn" id="settings-btn" title="Settings">⚙️</button>
-        <a href="/states.html" class="settings-btn" title="US States game" style="text-decoration:none;">🗺️</a>
         <h1 id="title">Multiplication Practice</h1>
       </div>
       <div class="points">🎮 <span id="points">0</span> / 1000</div>
