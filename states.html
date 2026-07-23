@@ -98,9 +98,9 @@
   #usmap g.state path.dc { pointer-events: none; }
 
   body.test-mode #usmap g.state path.quiz { cursor: pointer; }
-  body.test-mode #usmap g.state path.quiz:hover { fill: #ffe9a8; }
+  body.test-mode #usmap g.state path.quiz:hover { fill: #c4efc4; }
   body.learn-mode #usmap g.state path { cursor: default; }
-  body.learn-mode #usmap g.state path:hover { fill: #ffe9a8; }
+  body.learn-mode #usmap g.state path:hover { fill: #c4efc4; }
   #usmap g.state path.answered {
     fill: #d5d5d5 !important;
     cursor: default !important;
@@ -115,7 +115,18 @@
     text-anchor: middle;
   }
   .state-label.answered-label { fill: #555; }
+  /* Hovered state's label pops: bigger, green, with a white halo so it stays
+     readable — especially the offshore labels of small east-coast states. */
+  .state-label.hot {
+    font-size: 16px;
+    font-weight: 800;
+    fill: #1d6b2f;
+    stroke: #ffffff;
+    stroke-width: 3.5px;
+    paint-order: stroke;
+  }
   .leader-line { stroke: #b5a8cc; stroke-width: 1; pointer-events: none; }
+  .leader-line.hot { stroke: #2e8b57; stroke-width: 2.5; }
 
   .feedback-line {
     min-height: 34px;
@@ -591,6 +602,7 @@
 
   const labelLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   svg.appendChild(labelLayer);
+  let labelEls = {};   // { code: { t: <text>, line: <line>|null } }
 
   function labelPoint(code) {
     const b = statePaths[code].getBBox();
@@ -612,9 +624,10 @@
     const off = OFFSHORE[code];
     const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     t.setAttribute('class', 'state-label ' + (cls || ''));
+    let line = null;
     if (off) {
       const p = labelPoint(code);
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('class', 'leader-line');
       line.setAttribute('x1', p.x); line.setAttribute('y1', p.y);
       line.setAttribute('x2', off.x - 4); line.setAttribute('y2', off.y);
@@ -629,10 +642,22 @@
     }
     t.textContent = name;
     labelLayer.appendChild(t);
+    labelEls[code] = { t: t, line: line };
+  }
+
+  // Hover emphasis: pop the state's label (and leader line) so small states
+  // with offshore labels are easy to match to their shape.
+  function highlightLabel(code, on) {
+    const L = labelEls[code];
+    if (!L) return;
+    L.t.classList.toggle('hot', on);
+    if (L.line) L.line.classList.toggle('hot', on);
+    if (on) labelLayer.appendChild(L.t); // bring to front of other labels
   }
 
   function renderAll() {
     while (labelLayer.firstChild) labelLayer.removeChild(labelLayer.firstChild);
+    labelEls = {};
     let count = 0;
     for (const code of CODES) {
       const p = statePaths[code];
@@ -787,11 +812,15 @@
     const p = statePaths[code];
     if (!p) continue;
     p.addEventListener('mouseenter', function (e) {
+      highlightLabel(code, true);
       if (mode !== 'test' || answered[code]) return;
       clearTimeout(hoverTimer);
       hoverTimer = setTimeout(function () { openQuiz(code, e.clientX, e.clientY); }, 280);
     });
-    p.addEventListener('mouseleave', function () { clearTimeout(hoverTimer); });
+    p.addEventListener('mouseleave', function () {
+      highlightLabel(code, false);
+      clearTimeout(hoverTimer);
+    });
     p.addEventListener('click', function (e) {
       if (mode !== 'test') {
         setFeedback('👆 That\'s ' + STATE_NAMES[code] + '!', false);
