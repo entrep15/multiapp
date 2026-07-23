@@ -56,6 +56,62 @@
     font-size: 14px;
     min-width: 92px;
   }
+  .pill-group { display: flex; gap: 8px; align-items: center; }
+  .robux-pill {
+    background: #fdf3e0;
+    color: #b06e00;
+    font-weight: 800;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .history-btn {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 60;
+    background: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  }
+  .history-btn:hover { transform: scale(1.06); }
+  .history-overlay {
+    position: fixed; inset: 0;
+    background: rgba(30, 20, 50, 0.55);
+    z-index: 70;
+    display: none;
+    align-items: center; justify-content: center;
+  }
+  .history-overlay.open { display: flex; }
+  .history-card {
+    background: #fff; border-radius: 16px; padding: 24px 28px;
+    max-width: 440px; width: 92%;
+    max-height: 80vh; overflow-y: auto;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    text-align: left;
+  }
+  .history-card h2 { color: #4a3568; margin: 0 0 4px; font-size: 20px; text-align: center; }
+  .history-card .caps-note { color: #999; font-size: 12px; text-align: center; margin: 0 0 14px; }
+  .history-card table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .history-card th {
+    text-align: left; color: #6a4f8c; font-size: 12px;
+    border-bottom: 2px solid #e4dcf0; padding: 6px 8px;
+  }
+  .history-card td { padding: 8px; border-bottom: 1px solid #f1edf6; color: #444; }
+  .history-card td.num { text-align: right; font-weight: 700; }
+  .history-card tr.today-row td { background: #fdf3e0; font-weight: 800; }
+  .history-card .close-btn {
+    display: block; margin: 16px auto 0;
+    background: #764ba2; color: #fff; border: none;
+    padding: 10px 26px; border-radius: 999px; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  .history-empty { color: #999; text-align: center; padding: 18px 0; }
   .mode-toggle {
     display: flex;
     gap: 6px;
@@ -228,7 +284,10 @@
     <div class="top-row">
       <a class="back-link" href="/">⬅️ Math Practice</a>
       <h1>🗺️ US States</h1>
-      <div class="progress-pill"><span id="done-count">0</span> / 50</div>
+      <div class="pill-group">
+        <div class="robux-pill" title="Today's Robucks">🎮 <span id="robux">0</span></div>
+        <div class="progress-pill"><span id="done-count">0</span> / 50</div>
+      </div>
     </div>
     <div class="mode-toggle">
       <button type="button" class="mode-btn active" data-mode="learn">📖 Learn</button>
@@ -469,6 +528,16 @@
     <div class="q-feedback" id="q-feedback"></div>
   </div>
 
+  <button type="button" class="history-btn" id="history-btn" title="Robucks by day">⚙️</button>
+  <div class="history-overlay" id="history-overlay">
+    <div class="history-card">
+      <h2>🎮 Robucks by Day</h2>
+      <p class="caps-note">Learn: 1 per state, max 50/day · Test: 2 per correct, max 100/day</p>
+      <div id="history-content"></div>
+      <button type="button" class="close-btn" id="history-close">Close</button>
+    </div>
+  </div>
+
   <div class="confetti-layer" id="confetti-layer"></div>
 
   <div class="login-overlay" id="login-overlay">
@@ -563,6 +632,88 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ day: getPTDate(), answered: answered }));
     } catch (e) {}
   }
+  // ----- Robucks ledger (persists ACROSS days — history by date) -----
+  // Learn: 1 Robuck per unique state clicked, max 50/day.
+  // Test: 2 Robucks per correct answer, max 100/day. Total possible: 150/day.
+  const ROBUX_KEY = 'us_states_robucks_v1';
+  const LEARN_CAP = 50, TEST_CAP = 100;
+  let ledger = { days: {} };
+  try {
+    const raw = localStorage.getItem(ROBUX_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && p.days && typeof p.days === 'object') ledger = p;
+    }
+  } catch (e) {}
+  function saveLedger() {
+    try { localStorage.setItem(ROBUX_KEY, JSON.stringify(ledger)); } catch (e) {}
+  }
+  function todayLedger() {
+    const day = getPTDate();
+    if (!ledger.days[day]) ledger.days[day] = { learn: 0, test: 0, learnStates: {} };
+    return ledger.days[day];
+  }
+  function renderRobux() {
+    const d = todayLedger();
+    document.getElementById('robux').textContent = d.learn + d.test;
+  }
+  // Returns robucks credited (0 or 1); newState says if this is today's first click on it.
+  function creditLearn(code) {
+    const d = todayLedger();
+    if (d.learnStates[code]) return { credited: 0, newState: false };
+    d.learnStates[code] = 1;
+    let credited = 0;
+    if (d.learn < LEARN_CAP) { d.learn += 1; credited = 1; }
+    saveLedger();
+    renderRobux();
+    return { credited: credited, newState: true };
+  }
+  // Returns robucks credited (0 or 2).
+  function creditTest() {
+    const d = todayLedger();
+    if (d.test >= TEST_CAP) return 0;
+    d.test = Math.min(TEST_CAP, d.test + 2);
+    saveLedger();
+    renderRobux();
+    return 2;
+  }
+
+  // ----- Robucks history panel -----
+  const historyOverlay = document.getElementById('history-overlay');
+  function renderHistory() {
+    const el = document.getElementById('history-content');
+    const days = Object.keys(ledger.days)
+      .sort(function (a, b) { return new Date(b) - new Date(a); });
+    if (!days.length) {
+      el.innerHTML = '<div class="history-empty">No Robucks earned yet — go play!</div>';
+      return;
+    }
+    const today = getPTDate();
+    let rows = '';
+    for (const day of days) {
+      const d = ledger.days[day];
+      const label = day === today ? day + ' (today)' : day;
+      rows += '<tr class="' + (day === today ? 'today-row' : '') + '">' +
+        '<td>' + label + '</td>' +
+        '<td class="num">' + (d.learn || 0) + '</td>' +
+        '<td class="num">' + (d.test || 0) + '</td>' +
+        '<td class="num">' + ((d.learn || 0) + (d.test || 0)) + '</td></tr>';
+    }
+    el.innerHTML = '<table><tr><th>Day</th><th style="text-align:right">📖 Learn</th>' +
+      '<th style="text-align:right">🎯 Test</th><th style="text-align:right">🎮 Total</th></tr>' +
+      rows + '</table>';
+  }
+  document.getElementById('history-btn').addEventListener('click', function () {
+    renderHistory();
+    historyOverlay.classList.add('open');
+  });
+  document.getElementById('history-close').addEventListener('click', function () {
+    historyOverlay.classList.remove('open');
+  });
+  historyOverlay.addEventListener('click', function (e) {
+    if (e.target === historyOverlay) historyOverlay.classList.remove('open');
+  });
+
   // Midnight PT rollover — clears the board within a minute even mid-session.
   setInterval(function () {
     try {
@@ -572,6 +723,7 @@
         answered = {};
         saveProgress();
         renderAll();
+        renderRobux(); // new day → today's Robucks start at 0 (history keeps old days)
         setFeedback('🌅 A new day — the map is fresh! Can you name all 50 again?', false);
       }
     } catch (e) {}
@@ -799,8 +951,10 @@
       answered[code] = true;
       saveProgress();
       closeQuiz();
+      const earned = creditTest();
       const msg = (firstTry ? FIRST_TRY : '') +
-        PRAISE[Math.floor(Math.random() * PRAISE.length)].replace('{name}', STATE_NAMES[code]);
+        PRAISE[Math.floor(Math.random() * PRAISE.length)].replace('{name}', STATE_NAMES[code]) +
+        (earned ? ' +' + earned + ' 🎮' : '');
       setFeedback(msg, false);
       chime(true);
       confetti(firstTry ? 26 : 14);
@@ -848,7 +1002,9 @@
     });
     p.addEventListener('click', function (e) {
       if (mode !== 'test') {
-        setFeedback('👆 That\'s ' + STATE_NAMES[code] + '!', false);
+        const r = creditLearn(code);
+        setFeedback('👆 That\'s ' + STATE_NAMES[code] + '!' + (r.credited ? ' +' + r.credited + ' 🎮' : ''), false);
+        if (r.newState) postEvent({ type: 'states-learn-click', state: code });
         return;
       }
       if (answered[code]) {
@@ -918,6 +1074,7 @@
   // ----- Boot -----
   loadProgress();
   renderAll();
+  renderRobux();
 })();
 </script>
 </body>

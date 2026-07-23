@@ -12,6 +12,20 @@ const REDIS_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_R
 
 const RECIPIENTS = ['raja.s.muthuraman@gmail.com', 'surekha.anant@gmail.com'];
 const SUBJECT = "Drohn Raja's Cheetah Mode - Day Over Day Report";
+const STATES_SUBJECT = "Drohn Raja's US States - Daily Report";
+
+const STATE_NAMES = {
+  al: 'Alabama', ak: 'Alaska', az: 'Arizona', ar: 'Arkansas', ca: 'California',
+  co: 'Colorado', ct: 'Connecticut', de: 'Delaware', fl: 'Florida', ga: 'Georgia',
+  hi: 'Hawaii', id: 'Idaho', il: 'Illinois', in: 'Indiana', ia: 'Iowa',
+  ks: 'Kansas', ky: 'Kentucky', la: 'Louisiana', me: 'Maine', md: 'Maryland',
+  ma: 'Massachusetts', mi: 'Michigan', mn: 'Minnesota', ms: 'Mississippi', mo: 'Missouri',
+  mt: 'Montana', ne: 'Nebraska', nv: 'Nevada', nh: 'New Hampshire', nj: 'New Jersey',
+  nm: 'New Mexico', ny: 'New York', nc: 'North Carolina', nd: 'North Dakota', oh: 'Ohio',
+  ok: 'Oklahoma', or: 'Oregon', pa: 'Pennsylvania', ri: 'Rhode Island', sc: 'South Carolina',
+  sd: 'South Dakota', tn: 'Tennessee', tx: 'Texas', ut: 'Utah', vt: 'Vermont',
+  va: 'Virginia', wa: 'Washington', wv: 'West Virginia', wi: 'Wisconsin', wy: 'Wyoming'
+};
 
 async function redis(cmd) {
   const r = await fetch(REDIS_URL, {
@@ -96,6 +110,90 @@ export function getTableStats(events, op, table, mode) {
     resets: strike2,
     reconciles: secondAttemptCorrect + strike2 === secondAttemptTotal
   };
+}
+
+// ----- US States daily report -----
+// Robucks rules (mirror of the states page): Learn = 1 per unique state
+// clicked, max 50/day. Test = 2 per correct answer, max 100/day.
+export function buildStatesStats(todayEvents) {
+  const learnStates = {};   // code -> true (unique clicks)
+  const testStates = {};    // code -> { correct: n, wrong: n, firstTry: bool }
+  let correctCount = 0;
+  let allComplete = 0;
+
+  for (const e of todayEvents) {
+    if (e.type === 'states-learn-click' && STATE_NAMES[e.state]) {
+      learnStates[e.state] = true;
+    } else if (e.type === 'states-correct' && STATE_NAMES[e.state]) {
+      correctCount++;
+      if (!testStates[e.state]) testStates[e.state] = { correct: 0, wrong: 0, firstTry: false };
+      testStates[e.state].correct++;
+      if (e.firstTry) testStates[e.state].firstTry = true;
+    } else if (e.type === 'states-wrong' && STATE_NAMES[e.state]) {
+      if (!testStates[e.state]) testStates[e.state] = { correct: 0, wrong: 0, firstTry: false };
+      testStates[e.state].wrong++;
+    } else if (e.type === 'states-all-complete') {
+      allComplete++;
+    }
+  }
+
+  const learnCount = Object.keys(learnStates).length;
+  return {
+    learnStates, testStates, correctCount, allComplete,
+    learnRobux: Math.min(50, learnCount),
+    testRobux: Math.min(100, correctCount * 2)
+  };
+}
+
+export function buildStatesReportHTML(s) {
+  const todayPT = new Date().toLocaleDateString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+  });
+  const totalRobux = s.learnRobux + s.testRobux;
+  const learnList = Object.keys(s.learnStates).map(c => STATE_NAMES[c]).sort();
+  const testCodes = Object.keys(s.testStates).sort((a, b) => STATE_NAMES[a] < STATE_NAMES[b] ? -1 : 1);
+
+  let body;
+  if (!learnList.length && !testCodes.length) {
+    body = '<p style="font-size:16px;">😴 Drohn didn\'t play US States today.</p>';
+  } else {
+    let testRows = '';
+    for (const c of testCodes) {
+      const t = s.testStates[c];
+      let result;
+      if (t.correct > 0 && t.firstTry && t.wrong === 0) result = '🌟 First try';
+      else if (t.correct > 0) result = '✅ Got it after ' + t.wrong + ' miss' + (t.wrong === 1 ? '' : 'es');
+      else result = '❌ Tried, not yet (' + t.wrong + ' miss' + (t.wrong === 1 ? '' : 'es') + ')';
+      testRows += '<tr><td style="padding:6px 8px;border-bottom:1px solid #eee;"><b>' + STATE_NAMES[c] + '</b></td>' +
+        '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + result + '</td></tr>';
+    }
+    const testTable = testRows
+      ? '<table style="width:100%;border-collapse:collapse;font-size:14px;margin:8px 0 16px;">' +
+        '<tr style="background:#f9f9f9;"><th style="text-align:left;padding:6px 8px;">State</th>' +
+        '<th style="text-align:left;padding:6px 8px;">Result</th></tr>' + testRows + '</table>'
+      : '<p><i>No Test Mode play today.</i></p>';
+    const learnHtml = learnList.length
+      ? '<p style="font-size:14px;line-height:1.6;">' + learnList.join(' · ') + '</p>'
+      : '<p><i>No Learn Mode play today.</i></p>';
+
+    body =
+      '<p style="font-size:16px;"><b>🎮 Robucks today: ' + totalRobux + ' / 150</b><br/>' +
+      '<span style="color:#888;font-size:13px;">📖 Learn: ' + s.learnRobux + ' / 50 · 🎯 Test: ' + s.testRobux + ' / 100</span></p>' +
+      (s.allComplete ? '<p style="font-size:15px;">🏆 Completed the FULL 50-state map ' + s.allComplete + ' time' + (s.allComplete === 1 ? '' : 's') + ' today!</p>' : '') +
+      '<h2 style="color:#764ba2;border-bottom:2px solid #ece8f3;padding-bottom:6px;">📖 Learn Mode — ' + learnList.length + ' state' + (learnList.length === 1 ? '' : 's') + ' explored</h2>' +
+      learnHtml +
+      '<h2 style="color:#764ba2;border-bottom:2px solid #ece8f3;padding-bottom:6px;">🎯 Test Mode — ' + s.correctCount + ' correct answer' + (s.correctCount === 1 ? '' : 's') + '</h2>' +
+      testTable;
+  }
+
+  return '<!doctype html><html><body style="font-family:-apple-system,\'Segoe UI\',Helvetica,Arial,sans-serif;color:#222;max-width:640px;margin:0 auto;padding:20px;background:#fff;">' +
+    '<h1 style="color:#5d3a82;margin-bottom:0;">🗺️ Drohn Raja — US States</h1>' +
+    '<p style="color:#888;font-size:13px;margin-top:4px;">' + todayPT + '</p>' +
+    body +
+    '<hr style="border:none;border-top:1px solid #ddd;margin:28px 0 12px;"/>' +
+    '<p style="font-size:11px;color:#aaa;">Sent by Vercel Cron · <a href="https://multiplication-practice-zeta.vercel.app/states.html" style="color:#888;">Open the map</a></p>' +
+    '</body></html>';
 }
 
 // Build the report HTML
@@ -317,7 +415,20 @@ export default async function handler(req, res) {
       html: html
     });
 
-    return res.status(200).json({ ok: true, sentTo: RECIPIENTS, eventCount: todayEvents.length });
+    // Second email from the same cron slot (Hobby plan caps this project at
+    // 2 crons): the US States daily report.
+    const statesStats = buildStatesStats(todayEvents);
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: RECIPIENTS.join(', '),
+      subject: STATES_SUBJECT,
+      html: buildStatesReportHTML(statesStats)
+    });
+
+    return res.status(200).json({
+      ok: true, sentTo: RECIPIENTS, eventCount: todayEvents.length,
+      statesRobux: statesStats.learnRobux + statesStats.testRobux
+    });
   } catch (e) {
     console.error('Error sending Cheetah report:', e);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
