@@ -725,6 +725,8 @@
         renderAll();
         renderRobux(); // new day → today's Robucks start at 0 (history keeps old days)
         setFeedback('🌅 A new day — the map is fresh! Can you name all 50 again?', false);
+        closeQuiz();
+        if (mode === 'test') setTimeout(startTestFlow, 1200);
       }
     } catch (e) {}
   }, 60000);
@@ -874,6 +876,33 @@
     } catch (e) {}
   }
 
+  // ----- Guided west→east test order -----
+  // Hawaii and Alaska lead off (per spec), then the mainland sorted by each
+  // state's horizontal position on the map — an automatic west-to-east tour.
+  let TEST_ORDER = null;
+  function buildTestOrder() {
+    const rest = CODES.filter(function (c) { return c !== 'hi' && c !== 'ak' && statePaths[c]; })
+      .sort(function (a, b) {
+        const ba = statePaths[a].getBBox(), bb = statePaths[b].getBBox();
+        return (ba.x + ba.width / 2) - (bb.x + bb.width / 2);
+      });
+    return ['hi', 'ak'].concat(rest);
+  }
+  function nextTestCode() {
+    if (!TEST_ORDER) TEST_ORDER = buildTestOrder();
+    for (let i = 0; i < TEST_ORDER.length; i++) {
+      const c = TEST_ORDER[i];
+      if (!answered[c] && statePaths[c]) return c;
+    }
+    return null;
+  }
+  // Present the next unanswered state on the tour (no free choice in Test mode).
+  function startTestFlow() {
+    if (mode !== 'test') return;
+    const c = nextTestCode();
+    if (c) openQuiz(c);
+  }
+
   // ----- Quiz popup -----
   function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
@@ -962,6 +991,7 @@
       postEvent({ type: 'states-correct', state: code, firstTry: firstTry });
       const count = renderAll();
       if (count >= 50) allDone();
+      else setTimeout(startTestFlow, 1800); // let the praise land, then next state on the tour
     } else {
       wrongThisPopup++;
       btn.classList.add('wrong');
@@ -983,6 +1013,7 @@
       saveProgress();
       renderAll();
       setFeedback('🔄 Fresh map! Can you do all 50 again?', false);
+      setTimeout(startTestFlow, 1200); // new round starts back at Hawaii
     }, 9000);
   }
 
@@ -990,37 +1021,33 @@
   for (const code of CODES) {
     const p = statePaths[code];
     if (!p) continue;
-    p.addEventListener('mouseenter', function (e) {
+    p.addEventListener('mouseenter', function () {
       highlightLabel(code, true);
-      if (mode !== 'test' || answered[code]) return;
-      clearTimeout(hoverTimer);
-      hoverTimer = setTimeout(function () { openQuiz(code, e.clientX, e.clientY); }, 280);
     });
     p.addEventListener('mouseleave', function () {
       highlightLabel(code, false);
-      clearTimeout(hoverTimer);
     });
-    p.addEventListener('click', function (e) {
+    p.addEventListener('click', function () {
       if (mode !== 'test') {
         const r = creditLearn(code);
         setFeedback('👆 That\'s ' + STATE_NAMES[code] + '!' + (r.credited ? ' +' + r.credited + ' 🎮' : ''), false);
         if (r.newState) postEvent({ type: 'states-learn-click', state: code });
         return;
       }
+      // Test mode is a guided west→east tour — no picking your own state.
       if (answered[code]) {
         setFeedback('✅ You already got ' + STATE_NAMES[code] + '!', false);
         return;
       }
-      clearTimeout(hoverTimer);
-      openQuiz(code, e.clientX, e.clientY);
+      if (code !== quizCode) {
+        setFeedback('👉 One at a time! Answer the highlighted state first.', true);
+        return;
+      }
+      if (!popEl.classList.contains('open')) openQuiz(code);
     });
   }
-  document.addEventListener('click', function (e) {
-    if (!popEl.classList.contains('open')) return;
-    if (popEl.contains(e.target)) return;
-    if (e.target.closest && e.target.closest('#usmap')) return;
-    closeQuiz();
-  });
+  // The popup is the whole interaction in Test mode — it never closes from
+  // an outside click; it moves on only when the state is answered.
 
   // ----- Mode toggle -----
   document.querySelectorAll('.mode-btn').forEach(function (b) {
@@ -1033,8 +1060,9 @@
       closeQuiz();
       setFeedback(mode === 'learn'
         ? '📖 Learn the states — hover around the map!'
-        : '🎯 Hover a white state and pick its name!', false);
+        : '🎯 Name each state as we travel west to east!', false);
       renderAll();
+      if (mode === 'test') setTimeout(startTestFlow, 600);
     });
   });
 
