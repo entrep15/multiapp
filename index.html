@@ -1659,6 +1659,9 @@
         postEvent({ type: 'mode-complete', op: operation, table: completedTable, mode: completedMode });
         if (isLastMode) postEvent({ type: 'table-complete', op: operation, table: completedTable });
       }
+      // A completion can finish a 3-day perfect streak — refresh skip rights
+      // (delayed so the just-posted events land on the server first).
+      setTimeout(fetchSkipEligibility, 3000);
       // IMMEDIATELY reset and save so it survives refresh/navigation before auto-advance
       tablePoints = { 1: 100 };
       recomputePoints();
@@ -1696,6 +1699,9 @@
         postEvent({ type: 'table-complete', op: operation, table: completedTable });
       }
     }
+    // A completion can finish a 3-day perfect streak — refresh skip rights
+    // (delayed so the just-posted events land on the server first).
+    setTimeout(fetchSkipEligibility, 3000);
     const advance = () => {
       if (advanced) return;
       advanced = true;
