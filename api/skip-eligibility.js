@@ -1,22 +1,22 @@
 // POST /api/skip-eligibility  { pin } → { ok, eligibility: { multiplication: {t: bool}, division: {t: bool} } }
 //
 // A table is skip-eligible when its 3 most recent QUALIFYING days were all
-// perfect. Per (op, table), a day with any Cheetah activity is:
-//   - perfect:  zero imperfections AND a cheetah mode-complete that day
-//               (every problem right on the very first attempt, table finished)
-//   - imperfect: any imperfection that day (breaks the streak)
-//   - neutral:  played but no imperfections and no completion (day ended
-//               mid-table — ignored, neither extends nor breaks the streak)
+// GOOD. Per Raja (2026-07-28): a day is GOOD as long as the table was
+// COMPLETED in Cheetah that day — it does not matter whether individual
+// problems were solved on the first or second try. Per (op, table):
+//   - good:    a cheetah mode-complete that day (retries forgiven)
+//   - bad:     played with misses but NEVER completed the table that day
+//              (breaks the streak)
+//   - neutral: brief clean play with no misses and no completion (day ended
+//              mid-table — ignored, neither extends nor breaks the streak)
 // Days don't have to be consecutive calendar days — only the last 3 qualifying
 // days matter.
 //
-// An "imperfection" is ANY evidence of a first-try miss, across all logging
-// eras (cheetah-strike events only started 2026-07-06; before that only raw
-// answer events exist):
+// A "miss" (used only to tell bad days from neutral ones) is any of, across
+// all logging eras (cheetah-strike events only started 2026-07-06):
 //   - a cheetah-strike event
 //   - a cheetah wrong/timeout answer event
-//   - a cheetah correct with firstAttempt === false (a 2nd-try success
-//     implies the 1st try missed)
+//   - a cheetah correct with firstAttempt === false
 
 const REDIS_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -77,8 +77,9 @@ export function computeEligibility(allEvents) {
         .sort()
         .reverse();
       const last3 = qualifying.slice(0, 3);
+      // GOOD day = completed the table that day (retries within the day are fine)
       eligibility[op][t] = last3.length === 3 &&
-        last3.every(day => perTable[day].imperfections === 0 && perTable[day].completed);
+        last3.every(day => perTable[day].completed);
     }
   }
   return eligibility;
