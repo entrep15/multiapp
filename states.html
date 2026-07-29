@@ -153,10 +153,38 @@
   #usmap .dccircle { display: none; }
   #usmap g.state path.dc { pointer-events: none; }
 
-  body.test-mode #usmap g.state path.quiz { cursor: pointer; }
-  body.test-mode #usmap g.state path.quiz:hover { fill: #c4efc4; }
-  body.learn-mode #usmap g.state path { cursor: default; }
-  body.learn-mode #usmap g.state path:hover { fill: #c4efc4; }
+  body.dog-mode #usmap g.state path.quiz { cursor: pointer; }
+  body.dog-mode #usmap g.state path.quiz:hover { fill: #c4efc4; }
+  body.snail-mode #usmap g.state path { cursor: default; }
+  body.snail-mode #usmap g.state path:hover { fill: #c4efc4; }
+  body.cheetah-mode #usmap g.state path.quiz { cursor: pointer; }
+  body.cheetah-mode #usmap g.state path.quiz:hover { fill: #c4efc4; }
+  #usmap g.state path.failed {
+    fill: #f5c6c6 !important;
+    cursor: default !important;
+  }
+  #usmap g.state path.wrong-flash { animation: wrongflash 0.5s; }
+  @keyframes wrongflash {
+    0%, 100% { fill: #ffffff; }
+    50% { fill: #f28b8b; }
+  }
+  .flashcard {
+    background: linear-gradient(90deg, #ff4d4d, #b71c1c);
+    color: #fff;
+    border-radius: 14px;
+    padding: 12px 18px;
+    margin: 0 auto 12px;
+    max-width: 460px;
+    font-size: 20px;
+    font-weight: 800;
+    box-shadow: 0 6px 18px rgba(183, 28, 28, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+  .flashcard.hidden { display: none; }
+  .flashcard .chances { font-size: 16px; letter-spacing: 2px; }
   #usmap g.state path.answered {
     fill: #d5d5d5 !important;
     cursor: default !important;
@@ -279,7 +307,7 @@
   }
 </style>
 </head>
-<body class="learn-mode">
+<body class="snail-mode">
   <div class="card">
     <div class="top-row">
       <a class="back-link" href="/">⬅️ Math Practice</a>
@@ -290,8 +318,13 @@
       </div>
     </div>
     <div class="mode-toggle">
-      <button type="button" class="mode-btn active" data-mode="learn">📖 Learn</button>
-      <button type="button" class="mode-btn" data-mode="test">🎯 Test</button>
+      <button type="button" class="mode-btn active" data-mode="snail">🐌 Snail</button>
+      <button type="button" class="mode-btn" data-mode="dog">🐕 Dog</button>
+      <button type="button" class="mode-btn" data-mode="cheetah">🐆 Cheetah</button>
+    </div>
+    <div class="flashcard hidden" id="flashcard">
+      🐆 Find: <span id="flash-name">—</span>
+      <span class="chances" id="flash-chances">❤️❤️❤️</span>
     </div>
     <div class="map-wrap" id="map-wrap">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 959 593">
@@ -532,7 +565,7 @@
   <div class="history-overlay" id="history-overlay">
     <div class="history-card">
       <h2>🎮 Robucks by Day</h2>
-      <p class="caps-note">Learn: 1 per state, max 50/day · Test: 2 per correct, max 100/day</p>
+      <p class="caps-note">Snail: 1 per state, max 50/day · Dog: 2 per correct, max 100/day</p>
       <div id="history-content"></div>
       <button type="button" class="close-btn" id="history-close">Close</button>
     </div>
@@ -602,12 +635,18 @@
   const svg = document.querySelector('#map-wrap svg');
   svg.id = 'usmap';
 
-  let mode = 'learn';
+  let mode = 'snail';      // 'snail' (learn) | 'dog' (pick the name) | 'cheetah' (find the state)
   let userPin = '';
-  let answered = {};       // { code: true }
+  let answered = {};       // dog-mode progress: { code: true }
   let hoverTimer = null;
-  let quizCode = null;     // state currently in the popup
+  let quizCode = null;     // state currently in the popup (dog mode)
   let wrongThisPopup = 0;
+
+  // Cheetah-mode progress: { code: 1|2|3 } = found on that attempt, 0 = not in 3 tries
+  const CHEETAH_KEY = 'us_states_cheetah_v1';
+  let cheetahResults = {};
+  let cheetahTarget = null;   // state currently on the flash card
+  let cheetahMisses = 0;
 
   // ----- PT-day persistence (marker travels WITH the data) -----
   function getPTDate() {
@@ -630,6 +669,27 @@
   function saveProgress() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ day: getPTDate(), answered: answered }));
+    } catch (e) {}
+  }
+  function loadCheetah() {
+    try {
+      const raw = localStorage.getItem(CHEETAH_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && p.day === getPTDate() && p.results && typeof p.results === 'object') {
+          cheetahResults = {};
+          for (const k in p.results) {
+            if (STATE_NAMES[k] && typeof p.results[k] === 'number') cheetahResults[k] = p.results[k];
+          }
+          return;
+        }
+      }
+    } catch (e) {}
+    cheetahResults = {};
+  }
+  function saveCheetah() {
+    try {
+      localStorage.setItem(CHEETAH_KEY, JSON.stringify({ day: getPTDate(), results: cheetahResults }));
     } catch (e) {}
   }
   // ----- Robucks ledger (persists ACROSS days — history by date) -----
@@ -699,8 +759,8 @@
         '<td class="num">' + (d.test || 0) + '</td>' +
         '<td class="num">' + ((d.learn || 0) + (d.test || 0)) + '</td></tr>';
     }
-    el.innerHTML = '<table><tr><th>Day</th><th style="text-align:right">📖 Learn</th>' +
-      '<th style="text-align:right">🎯 Test</th><th style="text-align:right">🎮 Total</th></tr>' +
+    el.innerHTML = '<table><tr><th>Day</th><th style="text-align:right">🐌 Snail</th>' +
+      '<th style="text-align:right">🐕 Dog</th><th style="text-align:right">🎮 Total</th></tr>' +
       rows + '</table>';
   }
   document.getElementById('history-btn').addEventListener('click', function () {
@@ -721,12 +781,16 @@
       const p = raw ? JSON.parse(raw) : null;
       if (p && p.day !== getPTDate()) {
         answered = {};
+        cheetahResults = {};
         saveProgress();
+        saveCheetah();
         renderAll();
         renderRobux(); // new day → today's Robucks start at 0 (history keeps old days)
         setFeedback('🌅 A new day — the map is fresh! Can you name all 50 again?', false);
         closeQuiz();
-        if (mode === 'test') setTimeout(startTestFlow, 1200);
+        hideFlashcard();
+        if (mode === 'dog') setTimeout(startTestFlow, 1200);
+        if (mode === 'cheetah') setTimeout(startCheetahFlow, 1200);
       }
     } catch (e) {}
   }, 60000);
@@ -809,6 +873,9 @@
     if (on) labelLayer.appendChild(L.t); // bring to front of other labels
   }
 
+  // Render the map for the CURRENT mode. Each mode has its own progress:
+  // snail = free exploring (labels everywhere), dog = `answered`,
+  // cheetah = `cheetahResults` (found → grey, missed 3× → soft red).
   function renderAll() {
     while (labelLayer.firstChild) labelLayer.removeChild(labelLayer.firstChild);
     labelEls = {};
@@ -816,13 +883,26 @@
     for (const code of CODES) {
       const p = statePaths[code];
       if (!p) continue;
-      const isDone = !!answered[code];
-      p.classList.toggle('answered', isDone);
-      if (isDone) count++;
-      if (mode === 'learn') {
-        drawLabel(code, isDone ? 'answered-label' : '');
-      } else if (isDone) {
-        drawLabel(code, 'answered-label');
+      p.classList.remove('answered', 'failed');
+      if (mode === 'cheetah') {
+        const r = cheetahResults[code];
+        const attempted = code in cheetahResults;
+        if (attempted) {
+          count++;
+          p.classList.add(r > 0 ? 'answered' : 'failed');
+          drawLabel(code, 'answered-label');
+        }
+      } else {
+        const isDone = !!answered[code];
+        if (isDone) {
+          p.classList.add('answered');
+          count++;
+        }
+        if (mode === 'snail') {
+          drawLabel(code, isDone ? 'answered-label' : '');
+        } else if (isDone) {
+          drawLabel(code, 'answered-label');
+        }
       }
     }
     doneCountEl.textContent = count;
@@ -896,11 +976,104 @@
     }
     return null;
   }
-  // Present the next unanswered state on the tour (no free choice in Test mode).
+  // Present the next unanswered state on the tour (no free choice in Dog mode).
   function startTestFlow() {
-    if (mode !== 'test') return;
+    if (mode !== 'dog') return;
     const c = nextTestCode();
     if (c) openQuiz(c);
+  }
+
+  // ----- Cheetah mode: flash card shows the NAME, kid clicks WHERE it is -----
+  // 3 chances per state; after the 3rd miss the state is revealed (soft red)
+  // and the tour moves on. Order is shuffled fresh each round.
+  let CHEETAH_ORDER = null;
+  const flashEl = document.getElementById('flashcard');
+  function hideFlashcard() {
+    flashEl.classList.add('hidden');
+    cheetahTarget = null;
+  }
+  function updateFlashcard() {
+    document.getElementById('flash-name').textContent = cheetahTarget ? STATE_NAMES[cheetahTarget].toUpperCase() : '—';
+    document.getElementById('flash-chances').textContent = '❤️'.repeat(Math.max(0, 3 - cheetahMisses));
+  }
+  function nextCheetahCode() {
+    if (!CHEETAH_ORDER) CHEETAH_ORDER = shuffle(CODES.slice());
+    for (let i = 0; i < CHEETAH_ORDER.length; i++) {
+      const c = CHEETAH_ORDER[i];
+      if (!(c in cheetahResults) && statePaths[c]) return c;
+    }
+    return null;
+  }
+  function startCheetahFlow() {
+    if (mode !== 'cheetah') return;
+    const c = nextCheetahCode();
+    if (!c) return;
+    cheetahTarget = c;
+    cheetahMisses = 0;
+    flashEl.classList.remove('hidden');
+    updateFlashcard();
+  }
+  function handleCheetahGuess(code) {
+    if (!cheetahTarget) return;
+    if (code in cheetahResults) {
+      setFeedback('✅ ' + STATE_NAMES[code] + ' is already done — find ' + STATE_NAMES[cheetahTarget] + '!', true);
+      return;
+    }
+    if (code === cheetahTarget) {
+      const attempt = cheetahMisses + 1;
+      cheetahResults[code] = attempt;
+      saveCheetah();
+      const flair = attempt === 1 ? '🌟 FIRST TRY! ' : '';
+      setFeedback(flair + '🎉 You got it right! That\'s ' + STATE_NAMES[code] + '!', false);
+      chime(true);
+      confetti(attempt === 1 ? 26 : 14);
+      speak((attempt === 1 ? 'First try! ' : '') + 'You got it right! That\'s ' + STATE_NAMES[code] + '!');
+      postEvent({ type: 'states-cheetah-correct', state: code, attempt: attempt });
+      const count = renderAll();
+      hideFlashcard();
+      if (count >= 50) cheetahAllDone();
+      else setTimeout(startCheetahFlow, 1800);
+    } else {
+      cheetahMisses++;
+      // brief red pulse on the wrongly clicked state
+      const wrongPath = statePaths[code];
+      wrongPath.classList.add('wrong-flash');
+      setTimeout(function () { wrongPath.classList.remove('wrong-flash'); }, 550);
+      chime(false);
+      if (cheetahMisses >= 3) {
+        const target = cheetahTarget;
+        cheetahResults[target] = 0;
+        saveCheetah();
+        setFeedback('❌ That was 3 tries — THIS is ' + STATE_NAMES[target] + '! Moving on.', true);
+        speak('That was three tries. This is ' + STATE_NAMES[target] + '. Moving on!');
+        postEvent({ type: 'states-cheetah-fail', state: target });
+        const count = renderAll(); // reveals it in red with its name
+        highlightLabel(target, true);
+        setTimeout(function () { highlightLabel(target, false); }, 2400);
+        hideFlashcard();
+        if (count >= 50) cheetahAllDone();
+        else setTimeout(startCheetahFlow, 2600);
+      } else {
+        updateFlashcard();
+        const left = 3 - cheetahMisses;
+        setFeedback('❌ Not there! That was ' + STATE_NAMES[code] + '. ' + left + ' more chance' + (left === 1 ? '' : 's') + '!', true);
+      }
+    }
+  }
+  function cheetahAllDone() {
+    const found = Object.keys(cheetahResults).filter(function (c) { return cheetahResults[c] > 0; }).length;
+    setFeedback('🎉 CONGRATULATIONS! 🎉 Cheetah round done — you found ' + found + ' of 50 states! 🐆', false);
+    confetti(160);
+    speak('Congratulations! Cheetah round done! You found ' + found + ' of fifty states!');
+    postEvent({ type: 'states-cheetah-round-complete', found: found });
+    setTimeout(function () {
+      cheetahResults = {};
+      CHEETAH_ORDER = null; // fresh shuffle next round
+      saveCheetah();
+      renderAll();
+      setFeedback('🔄 Fresh map! Another Cheetah round?', false);
+      setTimeout(startCheetahFlow, 1200);
+    }, 9000);
   }
 
   // ----- Quiz popup -----
@@ -913,7 +1086,7 @@
   }
 
   function openQuiz(code, cx, cy) {
-    if (mode !== 'test' || answered[code]) return;
+    if (mode !== 'dog' || answered[code]) return;
     closeQuiz();
     quizCode = code;
     wrongThisPopup = 0;
@@ -1028,13 +1201,17 @@
       highlightLabel(code, false);
     });
     p.addEventListener('click', function () {
-      if (mode !== 'test') {
+      if (mode === 'snail') {
         const r = creditLearn(code);
         setFeedback('👆 That\'s ' + STATE_NAMES[code] + '!' + (r.credited ? ' +' + r.credited + ' 🎮' : ''), false);
         if (r.newState) postEvent({ type: 'states-learn-click', state: code });
         return;
       }
-      // Test mode is a guided west→east tour — no picking your own state.
+      if (mode === 'cheetah') {
+        handleCheetahGuess(code);
+        return;
+      }
+      // Dog mode is a guided west→east tour — no picking your own state.
       if (answered[code]) {
         setFeedback('✅ You already got ' + STATE_NAMES[code] + '!', false);
         return;
@@ -1046,7 +1223,7 @@
       if (!popEl.classList.contains('open')) openQuiz(code);
     });
   }
-  // The popup is the whole interaction in Test mode — it never closes from
+  // The popup is the whole interaction in Dog mode — it never closes from
   // an outside click; it moves on only when the state is answered.
 
   // ----- Mode toggle -----
@@ -1058,11 +1235,15 @@
       });
       document.body.className = mode + '-mode';
       closeQuiz();
-      setFeedback(mode === 'learn'
-        ? '📖 Learn the states — hover around the map!'
-        : '🎯 Name each state as we travel west to east!', false);
+      hideFlashcard();
+      setFeedback(mode === 'snail'
+        ? '🐌 Learn the states — hover around the map!'
+        : mode === 'dog'
+          ? '🐕 Name each state as we travel west to east!'
+          : '🐆 Read the card, then click WHERE that state is!', false);
       renderAll();
-      if (mode === 'test') setTimeout(startTestFlow, 600);
+      if (mode === 'dog') setTimeout(startTestFlow, 600);
+      if (mode === 'cheetah') setTimeout(startCheetahFlow, 600);
     });
   });
 
@@ -1081,7 +1262,7 @@
         userPin = pin;
         document.getElementById('login-overlay').classList.add('hidden');
         postEvent({ type: 'states-session-start' });
-        setFeedback('📖 Learn the states — hover around the map!', false);
+        setFeedback('🐌 Learn the states — hover around the map!', false);
       } else if (res.status === 401) {
         errEl.textContent = 'Oops! Wrong code. Try again.';
         document.getElementById('login-pin').value = '';
@@ -1101,6 +1282,7 @@
 
   // ----- Boot -----
   loadProgress();
+  loadCheetah();
   renderAll();
   renderRobux();
 })();

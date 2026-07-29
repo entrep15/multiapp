@@ -12,7 +12,7 @@ const REDIS_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_R
 
 const RECIPIENTS = ['raja.s.muthuraman@gmail.com', 'surekha.anant@gmail.com'];
 const SUBJECT = "Drohn Raja's Cheetah Mode - Day Over Day Report";
-const STATES_SUBJECT = "Drohn Raja's US States - Daily Report";
+const STATES_SUBJECT = "Drohn Raja's US States Cheetah Mode - Daily Report";
 
 const STATE_NAMES = {
   al: 'Alabama', ak: 'Alaska', az: 'Arizona', ar: 'Arkansas', ca: 'California',
@@ -112,37 +112,26 @@ export function getTableStats(events, op, table, mode) {
   };
 }
 
-// ----- US States daily report -----
-// Robucks rules (mirror of the states page): Learn = 1 per unique state
-// clicked, max 50/day. Test = 2 per correct answer, max 100/day.
+// ----- US States daily report: CHEETAH MODE ONLY (per Raja, 2026-07) -----
+// Cheetah = flash card shows the state's name, the kid clicks where it is;
+// 3 chances per state. Events: states-cheetah-correct {state, attempt 1|2|3}
+// and states-cheetah-fail {state} (not found in 3 tries).
+// If a state was played in multiple rounds in one day, the FIRST result of
+// the day is reported (their starting knowledge, before repeats).
 export function buildStatesStats(todayEvents) {
-  const learnStates = {};   // code -> true (unique clicks)
-  const testStates = {};    // code -> { correct: n, wrong: n, firstTry: bool }
-  let correctCount = 0;
-  let allComplete = 0;
-
-  for (const e of todayEvents) {
-    if (e.type === 'states-learn-click' && STATE_NAMES[e.state]) {
-      learnStates[e.state] = true;
-    } else if (e.type === 'states-correct' && STATE_NAMES[e.state]) {
-      correctCount++;
-      if (!testStates[e.state]) testStates[e.state] = { correct: 0, wrong: 0, firstTry: false };
-      testStates[e.state].correct++;
-      if (e.firstTry) testStates[e.state].firstTry = true;
-    } else if (e.type === 'states-wrong' && STATE_NAMES[e.state]) {
-      if (!testStates[e.state]) testStates[e.state] = { correct: 0, wrong: 0, firstTry: false };
-      testStates[e.state].wrong++;
-    } else if (e.type === 'states-all-complete') {
-      allComplete++;
+  const cheetah = {};   // code -> 1 | 2 | 3 (attempt it was found on) | 0 (not in 3)
+  let rounds = 0;
+  const sorted = todayEvents.slice().sort((a, b) => a.ts - b.ts);
+  for (const e of sorted) {
+    if (e.type === 'states-cheetah-correct' && STATE_NAMES[e.state]) {
+      if (!(e.state in cheetah)) cheetah[e.state] = [1, 2, 3].includes(e.attempt) ? e.attempt : 1;
+    } else if (e.type === 'states-cheetah-fail' && STATE_NAMES[e.state]) {
+      if (!(e.state in cheetah)) cheetah[e.state] = 0;
+    } else if (e.type === 'states-cheetah-round-complete') {
+      rounds++;
     }
   }
-
-  const learnCount = Object.keys(learnStates).length;
-  return {
-    learnStates, testStates, correctCount, allComplete,
-    learnRobux: Math.min(50, learnCount),
-    testRobux: Math.min(100, correctCount * 2)
-  };
+  return { cheetah, rounds };
 }
 
 export function buildStatesReportHTML(s) {
@@ -150,45 +139,38 @@ export function buildStatesReportHTML(s) {
     timeZone: 'America/Los_Angeles',
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
   });
-  const totalRobux = s.learnRobux + s.testRobux;
-  const learnList = Object.keys(s.learnStates).map(c => STATE_NAMES[c]).sort();
-  const testCodes = Object.keys(s.testStates).sort((a, b) => STATE_NAMES[a] < STATE_NAMES[b] ? -1 : 1);
+  const codes = Object.keys(s.cheetah).sort((a, b) => STATE_NAMES[a] < STATE_NAMES[b] ? -1 : 1);
 
   let body;
-  if (!learnList.length && !testCodes.length) {
-    body = '<p style="font-size:16px;">😴 Drohn didn\'t play US States today.</p>';
+  if (!codes.length) {
+    body = '<p style="font-size:16px;">😴 Drohn didn\'t play Cheetah Mode on the map today.</p>';
   } else {
-    let testRows = '';
-    for (const c of testCodes) {
-      const t = s.testStates[c];
-      let result;
-      if (t.correct > 0 && t.firstTry && t.wrong === 0) result = '🌟 First try';
-      else if (t.correct > 0) result = '✅ Got it after ' + t.wrong + ' miss' + (t.wrong === 1 ? '' : 'es');
-      else result = '❌ Tried, not yet (' + t.wrong + ' miss' + (t.wrong === 1 ? '' : 'es') + ')';
-      testRows += '<tr><td style="padding:6px 8px;border-bottom:1px solid #eee;"><b>' + STATE_NAMES[c] + '</b></td>' +
-        '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + result + '</td></tr>';
+    const RESULT = {
+      1: { label: '🌟 First try', bg: '#e7f8e7' },
+      2: { label: '✌️ Second try', bg: '#f2f8e0' },
+      3: { label: '3️⃣ Third try', bg: '#fdf3dd' },
+      0: { label: '❌ Not in 3 tries', bg: '#fdeaea' }
+    };
+    const counts = { 1: 0, 2: 0, 3: 0, 0: 0 };
+    let rows = '';
+    for (const c of codes) {
+      const r = s.cheetah[c];
+      counts[r]++;
+      rows += '<tr style="background:' + RESULT[r].bg + ';">' +
+        '<td style="padding:6px 10px;border-bottom:1px solid #fff;"><b>' + STATE_NAMES[c] + '</b></td>' +
+        '<td style="padding:6px 10px;border-bottom:1px solid #fff;">' + RESULT[r].label + '</td></tr>';
     }
-    const testTable = testRows
-      ? '<table style="width:100%;border-collapse:collapse;font-size:14px;margin:8px 0 16px;">' +
-        '<tr style="background:#f9f9f9;"><th style="text-align:left;padding:6px 8px;">State</th>' +
-        '<th style="text-align:left;padding:6px 8px;">Result</th></tr>' + testRows + '</table>'
-      : '<p><i>No Test Mode play today.</i></p>';
-    const learnHtml = learnList.length
-      ? '<p style="font-size:14px;line-height:1.6;">' + learnList.join(' · ') + '</p>'
-      : '<p><i>No Learn Mode play today.</i></p>';
-
     body =
-      '<p style="font-size:16px;"><b>🎮 Robucks today: ' + totalRobux + ' / 150</b><br/>' +
-      '<span style="color:#888;font-size:13px;">📖 Learn: ' + s.learnRobux + ' / 50 · 🎯 Test: ' + s.testRobux + ' / 100</span></p>' +
-      (s.allComplete ? '<p style="font-size:15px;">🏆 Completed the FULL 50-state map ' + s.allComplete + ' time' + (s.allComplete === 1 ? '' : 's') + ' today!</p>' : '') +
-      '<h2 style="color:#764ba2;border-bottom:2px solid #ece8f3;padding-bottom:6px;">📖 Learn Mode — ' + learnList.length + ' state' + (learnList.length === 1 ? '' : 's') + ' explored</h2>' +
-      learnHtml +
-      '<h2 style="color:#764ba2;border-bottom:2px solid #ece8f3;padding-bottom:6px;">🎯 Test Mode — ' + s.correctCount + ' correct answer' + (s.correctCount === 1 ? '' : 's') + '</h2>' +
-      testTable;
+      '<p style="font-size:15px;"><b>' + codes.length + ' state' + (codes.length === 1 ? '' : 's') + ' attempted:</b> ' +
+      '🌟 ' + counts[1] + ' on the first try · ✌️ ' + counts[2] + ' on the second · 3️⃣ ' + counts[3] + ' on the third · ❌ ' + counts[0] + ' not found</p>' +
+      (s.rounds ? '<p style="font-size:14px;">🏁 Finished ' + s.rounds + ' full 50-state round' + (s.rounds === 1 ? '' : 's') + ' today.</p>' : '') +
+      '<table style="width:100%;border-collapse:collapse;font-size:14px;margin:10px 0 16px;">' +
+      '<tr style="background:#f1edf6;"><th style="text-align:left;padding:6px 10px;">State</th>' +
+      '<th style="text-align:left;padding:6px 10px;">Found on</th></tr>' + rows + '</table>';
   }
 
   return '<!doctype html><html><body style="font-family:-apple-system,\'Segoe UI\',Helvetica,Arial,sans-serif;color:#222;max-width:640px;margin:0 auto;padding:20px;background:#fff;">' +
-    '<h1 style="color:#5d3a82;margin-bottom:0;">🗺️ Drohn Raja — US States</h1>' +
+    '<h1 style="color:#5d3a82;margin-bottom:0;">🐆 Drohn Raja — US States Cheetah Mode</h1>' +
     '<p style="color:#888;font-size:13px;margin-top:4px;">' + todayPT + '</p>' +
     body +
     '<hr style="border:none;border-top:1px solid #ddd;margin:28px 0 12px;"/>' +
@@ -427,7 +409,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true, sentTo: RECIPIENTS, eventCount: todayEvents.length,
-      statesRobux: statesStats.learnRobux + statesStats.testRobux
+      cheetahStatesAttempted: Object.keys(statesStats.cheetah).length
     });
   } catch (e) {
     console.error('Error sending Cheetah report:', e);
