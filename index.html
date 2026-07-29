@@ -942,6 +942,12 @@
 
   // Show login immediately when page loads
   showLoginOverlay();
+  // Same-tab session carry-over (Math ↔ Maps): if this tab already logged in,
+  // re-validate the stored PIN silently and skip the overlay.
+  try {
+    const carriedPin = sessionStorage.getItem('mp_pin');
+    if (carriedPin) setTimeout(function () { tryLogin(carriedPin); }, 0);
+  } catch (e) {}
 
   // Now load and prepare game state (but don't show it yet)
   operation = combined.op;
@@ -2349,7 +2355,10 @@
       });
       if (res.ok) {
         userPin = pin;
-        // PIN is NOT stored in localStorage — it's a session-only credential.
+        // PIN is NOT stored in localStorage — but it IS kept in sessionStorage
+        // so hopping between Math and Maps in the same tab doesn't re-ask.
+        // Closing the tab/app still requires the code again.
+        try { sessionStorage.setItem('mp_pin', pin); } catch (e) {}
         const overlay = document.getElementById('login-overlay');
         if (overlay) overlay.classList.add('hidden');
         // Show the current problem (or a fresh one if none is pending)
@@ -2357,6 +2366,7 @@
         postEvent({ type: 'session-start' });
         fetchSkipEligibility();
       } else if (res.status === 401) {
+        try { sessionStorage.removeItem('mp_pin'); } catch (e) {}
         loginErrorEl.textContent = 'Oops! Wrong code. Try again.';
         loginPinEl.value = '';
         loginPinEl.focus();

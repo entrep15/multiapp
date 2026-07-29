@@ -1260,10 +1260,13 @@
       });
       if (res.ok) {
         userPin = pin;
+        // Same-tab session carry-over (Math ↔ Maps) — see index.html.
+        try { sessionStorage.setItem('mp_pin', pin); } catch (e) {}
         document.getElementById('login-overlay').classList.add('hidden');
         postEvent({ type: 'states-session-start' });
         setFeedback('🐌 Learn the states — hover around the map!', false);
       } else if (res.status === 401) {
+        try { sessionStorage.removeItem('mp_pin'); } catch (e) {}
         errEl.textContent = 'Oops! Wrong code. Try again.';
         document.getElementById('login-pin').value = '';
       } else {
@@ -1285,6 +1288,11 @@
   loadCheetah();
   renderAll();
   renderRobux();
+  // Already logged in on the math page in this tab? Skip the code prompt.
+  try {
+    const carriedPin = sessionStorage.getItem('mp_pin');
+    if (carriedPin) tryLogin(carriedPin);
+  } catch (e) {}
 })();
 </script>
 </body>
