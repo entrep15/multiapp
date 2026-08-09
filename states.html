@@ -112,6 +112,24 @@
     padding: 10px 26px; border-radius: 999px; font-size: 15px; font-weight: 700; cursor: pointer;
   }
   .history-empty { color: #999; text-align: center; padding: 18px 0; }
+  .score-line {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 800;
+    color: #4a3568;
+    margin: 6px 0 14px;
+  }
+  .tip-row {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1edf6;
+    font-size: 14px;
+    color: #444;
+    line-height: 1.45;
+  }
+  .tip-row b { color: #b71c1c; white-space: nowrap; }
+  .tips-title { font-weight: 800; color: #6a4f8c; margin: 10px 0 4px; font-size: 15px; }
   .mode-toggle {
     display: flex;
     gap: 6px;
@@ -565,6 +583,15 @@
     <div class="q-feedback" id="q-feedback"></div>
   </div>
 
+  <div class="history-overlay" id="cheetah-summary">
+    <div class="history-card">
+      <h2>🐆 Cheetah Round Done!</h2>
+      <p class="score-line" id="cheetah-score"></p>
+      <div id="cheetah-tips"></div>
+      <button type="button" class="close-btn" id="cheetah-again">Try Again 🐆</button>
+    </div>
+  </div>
+
   <button type="button" class="history-btn" id="history-btn" title="Robucks by day">⚙️</button>
   <div class="history-overlay" id="history-overlay">
     <div class="history-card">
@@ -618,6 +645,61 @@
   const NUDGE = {
     mi: { dx: 16, dy: 30 }, la: { dx: -10, dy: 0 }, fl: { dx: 18, dy: 0 },
     id: { dx: 0, dy: 18 }, mn: { dx: -8, dy: 6 }, va: { dx: 6, dy: 6 }, ny: { dx: -4, dy: 8 }
+  };
+
+  // Memory tricks shown after a Cheetah round for the states the kid missed —
+  // shape, letter, and neighbor associations an 8-year-old can hang on to.
+  const MNEMONICS = {
+    al: 'Alabama stands tall between Mississippi and Georgia, with a tiny "toe" dipping into the ocean at the bottom.',
+    ak: 'Alaska is the BIGGEST state, sitting alone in the top-left corner with a long tail of islands.',
+    az: 'AriZona has a Zigzag on its left edge — Z for AriZona! Bottom-left of the Four Corners.',
+    ar: 'Arkansas is a square with its bottom-right corner bitten off, sitting right on top of Louisiana.',
+    ca: 'California Curves like a big letter C hugging the West Coast.',
+    co: 'Colorado is a perfect rectangle — one of only two! (Wyoming is the other one, higher up.)',
+    ct: 'Connecticut is a small rectangle tucked under Massachusetts — C for Compact!',
+    de: 'Delaware is tiny and thin like a needle on the East Coast — one of the smallest states.',
+    fl: 'Florida hangs down into the ocean like a flexing arm — F for Flexing!',
+    ga: 'Georgia guards the bottom-right corner of the country, sitting right on top of Florida.',
+    hi: 'Hawaii is the little chain of islands out in the ocean at the bottom-left.',
+    id: 'Idaho is the tall one with a skinny neck reaching up between Washington and Montana.',
+    il: 'ILlinois is taLL with a pointy bottom, like an arrowhead pointing south.',
+    in: 'Indiana is IN the middle — a tall sock squeezed between Illinois and Ohio.',
+    ia: 'Iowa looks like a fluffy pillow with wavy sides — rivers shape both edges.',
+    ks: 'Kansas is a rectangle with one bite taken out of its top-right corner.',
+    ky: 'Kentucky looks like a chicken drumstick lying on its side — think KFC: Kentucky Fried Chicken!',
+    la: 'Louisiana looks like the letter L — and Louisiana starts with L!',
+    me: 'Maine is the mitten at the very top-right tip of the country, waving at Canada.',
+    md: 'Maryland is the messy one wrapped around the Chesapeake Bay, right under Pennsylvania.',
+    ma: 'Massachusetts has a curling arm — Cape Cod flexes into the ocean like a muscle!',
+    mi: 'Michigan is the MITTEN state — M for Mitten! It looks like a winter glove by the Great Lakes.',
+    mn: 'Minnesota wears a pointy chimney hat that touches Canada, right at the top of the map.',
+    ms: 'MiSSiSSippi is tall and skinny, hugging the Mississippi River on its left edge.',
+    mo: 'Missouri is boxy with a little boot heel sticking out of its bottom-right corner.',
+    mt: 'MonTana = MounTain — the big wide one at the top with a staircase corner at its bottom-left.',
+    ne: 'Nebraska looks like a flag flying to the left, with a notch cut from its bottom-left.',
+    nv: 'NeVada narrows to a V — a point at the bottom, right next to California.',
+    nh: 'New Hampshire is the RIGHT one of the twin triangles at the top-right (Vermont is its mirror).',
+    nj: 'New Jersey is a little squiggle shaped like the letter J — J for New Jersey!',
+    nm: 'New Mexico is almost a square with a tiny boot toe at the bottom, right beside Arizona.',
+    ny: 'New York looks like someone lying down with an arm (Long Island) stretched into the ocean.',
+    nc: 'North Carolina is long and pointy toward the ocean, lying on TOP of South Carolina.',
+    nd: 'North Dakota is the TOP rectangle of the Dakota twins, up against Canada.',
+    oh: 'Ohio is round-ish, just like the O it starts with!',
+    ok: 'Oklahoma looks like a cooking pan with a long handle sticking out to the left!',
+    or: 'Oregon sits right under Washington in the top-left, with a wavy right edge.',
+    pa: 'Pennsylvania is the chunky block between New York and Maryland — its east side zigzags.',
+    ri: 'Rhode Island is the SMALLEST state — a tiny speck tucked under Massachusetts.',
+    sc: 'South Carolina is a slice of pie under North Carolina, pointing at the ocean.',
+    sd: 'South Dakota is the BOTTOM rectangle of the Dakota twins.',
+    tn: 'Tennessee is the long, flat one that leans sideways, lying on top of Alabama and Mississippi.',
+    tx: 'Texas is the giant at the bottom-middle with a pan-handle on top — everything is bigger in Texas!',
+    ut: 'Utah is a rectangle with a bite taken out of its top-right corner — Wyoming took the bite!',
+    vt: 'Vermont is the LEFT one of the twin triangles — V comes before N-H, and Vermont sits on the left.',
+    va: 'Virginia stretches from the mountains to the ocean, right under Maryland and West Virginia.',
+    wa: 'Washington holds the top-left corner of the whole country.',
+    wv: 'West Virginia is the wiggly one with no straight edges — it looks like a leaping frog!',
+    wi: 'Wisconsin sits between Minnesota and Lake Michigan — it looks like a chubby mitten friend of Michigan.',
+    wy: 'Wyoming is the other perfect rectangle, sitting right below Montana.'
   };
 
   const PRAISE = [
@@ -1012,19 +1094,16 @@
       return;
     }
     if (code === cheetahTarget) {
+      // Right → brief confirmation and IMMEDIATELY on to the next state.
       const attempt = cheetahMisses + 1;
       cheetahResults[code] = attempt;
-      saveCheetah();
-      const flair = attempt === 1 ? '🌟 FIRST TRY! ' : '';
-      setFeedback(flair + '🎉 You got it right! That\'s ' + STATE_NAMES[code] + '!', false);
+      setFeedback('✅ That\'s ' + STATE_NAMES[code] + '!', false);
       chime(true);
-      confetti(attempt === 1 ? 26 : 14);
-      speak((attempt === 1 ? 'First try! ' : '') + 'You got it right! That\'s ' + STATE_NAMES[code] + '!');
       postEvent({ type: 'states-cheetah-correct', state: code, attempt: attempt });
       const count = renderAll();
       hideFlashcard();
-      if (count >= 50) cheetahAllDone();
-      else setTimeout(startCheetahFlow, 1800);
+      if (count >= 50) cheetahRoundDone();
+      else startCheetahFlow();
     } else {
       cheetahMisses++;
       // brief red pulse on the wrongly clicked state
@@ -1035,38 +1114,53 @@
       if (cheetahMisses >= 3) {
         const target = cheetahTarget;
         cheetahResults[target] = 0;
-        saveCheetah();
         setFeedback('❌ That was 3 tries — THIS is ' + STATE_NAMES[target] + '! Moving on.', true);
-        speak('That was three tries. This is ' + STATE_NAMES[target] + '. Moving on!');
         postEvent({ type: 'states-cheetah-fail', state: target });
         const count = renderAll(); // reveals it in red with its name
         highlightLabel(target, true);
         setTimeout(function () { highlightLabel(target, false); }, 2400);
         hideFlashcard();
-        if (count >= 50) cheetahAllDone();
+        if (count >= 50) cheetahRoundDone();
         else setTimeout(startCheetahFlow, 2600);
       } else {
         updateFlashcard();
-        const left = 3 - cheetahMisses;
-        setFeedback('❌ Not there! That was ' + STATE_NAMES[code] + '. ' + left + ' more chance' + (left === 1 ? '' : 's') + '!', true);
+        const tryWord = cheetahMisses === 1 ? 'second' : 'third';
+        setFeedback('❌ Not there — that\'s your ' + tryWord + ' try. Find ' + STATE_NAMES[cheetahTarget] + '!', true);
       }
     }
   }
-  function cheetahAllDone() {
-    const found = Object.keys(cheetahResults).filter(function (c) { return cheetahResults[c] > 0; }).length;
-    setFeedback('🎉 CONGRATULATIONS! 🎉 Cheetah round done — you found ' + found + ' of 50 states! 🐆', false);
-    confetti(160);
-    speak('Congratulations! Cheetah round done! You found ' + found + ' of fifty states!');
-    postEvent({ type: 'states-cheetah-round-complete', found: found });
-    setTimeout(function () {
-      cheetahResults = {};
-      CHEETAH_ORDER = null; // fresh shuffle next round
-      saveCheetah();
-      renderAll();
-      setFeedback('🔄 Fresh map! Another Cheetah round?', false);
-      setTimeout(startCheetahFlow, 1200);
-    }, 9000);
+  // Round over: show right/wrong counts + memory tricks for the missed states.
+  function cheetahRoundDone() {
+    const codes = Object.keys(cheetahResults);
+    const right = codes.filter(function (c) { return cheetahResults[c] > 0; });
+    const wrong = codes.filter(function (c) { return cheetahResults[c] === 0; })
+      .sort(function (a, b) { return STATE_NAMES[a] < STATE_NAMES[b] ? -1 : 1; });
+    postEvent({ type: 'states-cheetah-round-complete', found: right.length, missed: wrong.length });
+
+    document.getElementById('cheetah-score').textContent =
+      '✅ Right: ' + right.length + '   ·   ❌ Wrong: ' + wrong.length;
+    const tipsEl = document.getElementById('cheetah-tips');
+    if (wrong.length) {
+      let html = '<div class="tips-title">💡 Tricks for the ones you missed:</div>';
+      for (const c of wrong) {
+        html += '<div class="tip-row"><b>' + STATE_NAMES[c] + '</b><span>' +
+          (MNEMONICS[c] || 'Find it in Snail Mode and give it another look!') + '</span></div>';
+      }
+      tipsEl.innerHTML = html;
+    } else {
+      tipsEl.innerHTML = '<div class="tips-title">🏆 A PERFECT round — all 50 states!</div>';
+    }
+    speak('Round done! You got ' + right.length + ' right and ' + wrong.length + ' wrong.');
+    document.getElementById('cheetah-summary').classList.add('open');
   }
+  document.getElementById('cheetah-again').addEventListener('click', function () {
+    document.getElementById('cheetah-summary').classList.remove('open');
+    cheetahResults = {};
+    CHEETAH_ORDER = null; // fresh shuffle next round
+    renderAll();
+    setFeedback('🔄 Fresh map — new Cheetah round!', false);
+    setTimeout(startCheetahFlow, 400);
+  });
 
   // ----- Quiz popup -----
   function shuffle(arr) {
