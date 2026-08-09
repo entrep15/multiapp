@@ -138,6 +138,10 @@
     color: #fff;
     box-shadow: 0 2px 6px rgba(118, 75, 162, 0.3);
   }
+  .mode-btn.locked {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
   .map-wrap { position: relative; }
   #usmap { width: 100%; height: auto; display: block; }
 
@@ -642,11 +646,14 @@
   let quizCode = null;     // state currently in the popup (dog mode)
   let wrongThisPopup = 0;
 
-  // Cheetah-mode progress: { code: 1|2|3 } = found on that attempt, 0 = not in 3 tries
-  const CHEETAH_KEY = 'us_states_cheetah_v1';
+  // Cheetah-mode progress: { code: 1|2|3 } = found on that attempt, 0 = not in 3 tries.
+  // SESSION-ONLY on purpose (anti-cheat): entering Cheetah locks Snail/Dog for
+  // the whole page session, and the only way out is a refresh — which wipes
+  // Cheetah progress. Peeking at labels always costs the round.
   let cheetahResults = {};
   let cheetahTarget = null;   // state currently on the flash card
   let cheetahMisses = 0;
+  let cheetahLocked = false;  // set once Cheetah is entered; cleared only by refresh
 
   // ----- PT-day persistence (marker travels WITH the data) -----
   function getPTDate() {
@@ -671,27 +678,12 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ day: getPTDate(), answered: answered }));
     } catch (e) {}
   }
+  // Cheetah progress deliberately does NOT persist (see anti-cheat note above).
   function loadCheetah() {
-    try {
-      const raw = localStorage.getItem(CHEETAH_KEY);
-      if (raw) {
-        const p = JSON.parse(raw);
-        if (p && p.day === getPTDate() && p.results && typeof p.results === 'object') {
-          cheetahResults = {};
-          for (const k in p.results) {
-            if (STATE_NAMES[k] && typeof p.results[k] === 'number') cheetahResults[k] = p.results[k];
-          }
-          return;
-        }
-      }
-    } catch (e) {}
     cheetahResults = {};
+    try { localStorage.removeItem('us_states_cheetah_v1'); } catch (e) {} // purge legacy key
   }
-  function saveCheetah() {
-    try {
-      localStorage.setItem(CHEETAH_KEY, JSON.stringify({ day: getPTDate(), results: cheetahResults }));
-    } catch (e) {}
-  }
+  function saveCheetah() { /* session-only by design — refresh wipes the round */ }
   // ----- Robucks ledger (persists ACROSS days — history by date) -----
   // Learn: 1 Robuck per unique state clicked, max 50/day.
   // Test: 2 Robucks per correct answer, max 100/day. Total possible: 150/day.
@@ -1229,7 +1221,20 @@
   // ----- Mode toggle -----
   document.querySelectorAll('.mode-btn').forEach(function (b) {
     b.addEventListener('click', function () {
-      mode = b.getAttribute('data-mode');
+      const targetMode = b.getAttribute('data-mode');
+      // Anti-cheat: once Cheetah has been entered, Snail/Dog stay locked for
+      // this page session. Leaving means refreshing — which resets the round.
+      if (cheetahLocked && targetMode !== 'cheetah') {
+        setFeedback('🔒 No peeking! To leave Cheetah Mode, refresh the page — your Cheetah round starts over.', true);
+        return;
+      }
+      if (targetMode === 'cheetah' && !cheetahLocked) {
+        cheetahLocked = true;
+        document.querySelectorAll('.mode-btn').forEach(function (x) {
+          if (x.getAttribute('data-mode') !== 'cheetah') x.classList.add('locked');
+        });
+      }
+      mode = targetMode;
       document.querySelectorAll('.mode-btn').forEach(function (x) {
         x.classList.toggle('active', x === b);
       });
