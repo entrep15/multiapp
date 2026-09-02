@@ -1,22 +1,22 @@
 // POST /api/skip-eligibility  { pin } → { ok, eligibility: { multiplication: {t: bool}, division: {t: bool} } }
 //
-// A table is skip-eligible when its 3 most recent QUALIFYING days were all
-// GOOD. Per Raja (2026-07-28): a day is GOOD as long as the table was
-// COMPLETED in Cheetah that day — it does not matter whether individual
-// problems were solved on the first or second try. Per (op, table):
-//   - good:    a cheetah mode-complete that day (retries forgiven)
-//   - bad:     played with misses but NEVER completed the table that day
-//              (breaks the streak)
-//   - neutral: brief clean play with no misses and no completion (day ended
-//              mid-table — ignored, neither extends nor breaks the streak)
-// Days don't have to be consecutive calendar days — only the last 3 qualifying
-// days matter.
+// A table is skip-eligible when its last 3 Cheetah COMPLETIONS were all
+// PERFECT FIRST-TRY RUNS. Per Raja (2026-08-28): the run that completes the
+// table must have all 10 problems answered correctly on the FIRST attempt
+// (no second chances used anywhere in the completing run). Three such
+// completions in a row earn the Skip — they do NOT have to fall on
+// consecutive calendar days (day 1, day 1+n, day 1+n+x all count). An
+// imperfect completion in between resets the count.
 //
-// A "miss" (used only to tell bad days from neutral ones) is any of, across
-// all logging eras (cheetah-strike events only started 2026-07-06):
-//   - a cheetah-strike event
-//   - a cheetah wrong/timeout answer event
-//   - a cheetah correct with firstAttempt === false
+// A "perfect run" is judged on the COMPLETING run only: an earlier failed
+// attempt the same day (table reset, then a clean 10/10) does not spoil it.
+// Detection: the 10 correct answers immediately before the mode-complete
+// must all carry firstAttempt: true, with no cheetah-strike events inside
+// that window.
+//
+// STREAK_RESET_EPOCH: all progress toward Skip was reset when this rule
+// shipped — only events after the epoch count.
+export const STREAK_RESET_EPOCH = 1787954449000; // 2026-08-28 15:00 PT
 
 const REDIS_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -39,47 +39,46 @@ function ptDayKey(ts) {
   return dayFmt.format(new Date(ts));
 }
 
-export function computeEligibility(allEvents) {
-  // days[op][table][dayKey] = { imperfections, completed, played }
-  const days = { multiplication: {}, division: {} };
-
+export function computeEligibility(allEvents, resetEpoch = STREAK_RESET_EPOCH) {
+  // Per (op, table): chronological cheetah corrects / strikes / completions
+  // after the reset epoch.
+  const groups = {};
   for (const e of allEvents) {
-    const op = e.op === 'division' ? 'division' : 'multiplication';
+    if (typeof e.ts !== 'number' || e.ts < resetEpoch) continue;
     const t = e.table;
     if (typeof t !== 'number' || t < 2 || t > 10) continue;
-
+    const isCorrect = e.type === 'correct' && e.mode === 'cheetah';
     const isStrike = e.type === 'cheetah-strike';
-    const isCheetahMiss = (e.type === 'wrong' || e.type === 'timeout') && e.mode === 'cheetah';
-    const isSecondTryCorrect = e.type === 'correct' && e.mode === 'cheetah' && e.firstAttempt === false;
-    const isCheetahAnswer = (e.type === 'correct' || e.type === 'wrong' || e.type === 'timeout') && e.mode === 'cheetah';
-    const isCheetahComplete = e.type === 'mode-complete' && e.mode === 'cheetah';
-    if (!isStrike && !isCheetahAnswer && !isCheetahComplete) continue;
-
-    const day = ptDayKey(e.ts);
-    if (!days[op][t]) days[op][t] = {};
-    if (!days[op][t][day]) days[op][t][day] = { imperfections: 0, completed: false, played: false };
-    const d = days[op][t][day];
-    d.played = true;
-    if (isStrike || isCheetahMiss || isSecondTryCorrect) d.imperfections++;
-    if (isCheetahComplete) d.completed = true;
+    const isComplete = e.type === 'mode-complete' && e.mode === 'cheetah';
+    if (!isCorrect && !isStrike && !isComplete) continue;
+    const op = e.op === 'division' ? 'division' : 'multiplication';
+    const k = op + '|' + t;
+    (groups[k] = groups[k] || []).push(e);
   }
 
   const eligibility = { multiplication: {}, division: {} };
   for (const op of ['multiplication', 'division']) {
     for (let t = 2; t <= 10; t++) {
-      const perTable = days[op][t] || {};
-      // Qualifying days (perfect or imperfect), most recent first
-      const qualifying = Object.keys(perTable)
-        .filter(day => {
-          const d = perTable[day];
-          return d.imperfections > 0 || d.completed; // neutral days drop out
-        })
-        .sort()
-        .reverse();
-      const last3 = qualifying.slice(0, 3);
-      // GOOD day = completed the table that day (retries within the day are fine)
-      eligibility[op][t] = last3.length === 3 &&
-        last3.every(day => perTable[day].completed);
+      const ev = (groups[op + '|' + t] || []).sort((a, b) => a.ts - b.ts);
+      // Every completion becomes one "time"; judge each completing run:
+      // walk back from the mode-complete collecting the last 10 corrects —
+      // hitting a strike first, or any correct not flagged first-try,
+      // makes that completion imperfect.
+      const completions = [];
+      for (let i = 0; i < ev.length; i++) {
+        if (ev[i].type !== 'mode-complete') continue;
+        const window10 = [];
+        let strikeInWindow = false;
+        for (let j = i - 1; j >= 0 && window10.length < 10; j--) {
+          if (ev[j].type === 'correct') window10.push(ev[j]);
+          else if (ev[j].type === 'cheetah-strike') { strikeInWindow = true; break; }
+        }
+        const perfect = !strikeInWindow && window10.length === 10 &&
+          window10.every(c => c.firstAttempt === true);
+        completions.push(perfect);
+      }
+      const last3 = completions.slice(-3);
+      eligibility[op][t] = last3.length === 3 && last3.every(Boolean);
     }
   }
   return eligibility;

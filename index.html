@@ -886,6 +886,8 @@
           if (parsed.division)       combined.division       = sanitizeGameState(parsed.division);
           // Daily-reset marker travels WITH the state (see checkAndApplyDailyReset)
           if (typeof parsed.lastResetDayPT === 'string') combined.lastResetDayPT = parsed.lastResetDayPT;
+          // One-time migration marker (see PROGRESS_RESET_VERSION below)
+          if (typeof parsed.progressResetVersion === 'number') combined.progressResetVersion = parsed.progressResetVersion;
         }
       } else {
         // First time on v3 — migrate from older single-game v2 key if present
@@ -992,6 +994,31 @@
     if (typeof postEvent === 'function') postEvent({ type: 'daily-reset', points: points });
   }
   checkAndApplyDailyReset();
+
+  // One-time FULL progress reset (2026-08-28): the Skip rule changed to
+  // "3 consecutive perfect first-try completions" and all multiplication and
+  // division progress starts fresh. Runs once per device, then never again.
+  const PROGRESS_RESET_VERSION = 2;
+  if ((combined.progressResetVersion || 0) < PROGRESS_RESET_VERSION) {
+    for (const opName of ['multiplication', 'division']) {
+      const slot = combined[opName];
+      if (!slot) continue;
+      slot.tablePoints = { 1: 100 };
+      slot.points = 100;
+      slot.currentTable = 2;
+      slot.currentMode = firstEnabledMode(opName);
+      slot.tableStreak = 0;
+      slot.cheetahFailures = 0;
+      slot.cheetahRunEarned = 0;
+      slot.frozenModeStates = {};
+      slot.currentProblem = null;
+      slot.bag = [];
+      slot.lastModePerTable = {};
+    }
+    combined.progressResetVersion = PROGRESS_RESET_VERSION;
+    applyLive(combined[operation]);
+    saveState();
+  }
 
   // Settings may have changed since the state was saved — never resume into a disabled mode.
   currentMode = clampToEnabled(currentMode);
