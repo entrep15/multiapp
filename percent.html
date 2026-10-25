@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Percent Practice</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px 36px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    text-align: center;
+  }
+  .top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    gap: 8px;
+  }
+  .back-link {
+    color: #764ba2;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13px;
+    background: #f1edf6;
+    padding: 8px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .back-link:hover { background: #e4dcf0; }
+  h1 { margin: 0; font-size: 22px; color: #4a3568; white-space: nowrap; }
+  .score-pill {
+    background: #f1edf6;
+    color: #6a4f8c;
+    font-weight: 800;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .mode-toggle {
+    display: flex;
+    gap: 6px;
+    background: #f1edf6;
+    padding: 4px;
+    border-radius: 999px;
+    margin: 0 auto 16px;
+  }
+  .mode-btn {
+    flex: 1;
+    background: transparent;
+    color: #6a4f8c;
+    border: none;
+    padding: 10px 6px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s, color 0.2s;
+  }
+  .mode-btn.active {
+    background: #764ba2;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(118, 75, 162, 0.3);
+  }
+  .mode-btn.dog.active { background: linear-gradient(90deg, #ff9a3d, #ff4d4d); }
+  .mode-btn.cheetah.active { background: linear-gradient(90deg, #ff4d4d, #b71c1c); }
+
+  .progress-label { font-size: 13px; color: #888; margin-bottom: 6px; }
+  .progress-bar { display: flex; gap: 4px; justify-content: center; margin-bottom: 18px; }
+  .progress-cell {
+    flex: 1; max-width: 32px; height: 10px;
+    background: #eee9f5; border-radius: 4px;
+  }
+  .progress-cell.right { background: #2e8b57; }
+  .progress-cell.second { background: #f6ad0f; }
+  .progress-cell.missed { background: #e74c3c; }
+
+  .question {
+    font-size: 30px;
+    font-weight: 800;
+    color: #333;
+    margin: 18px 0 6px;
+    line-height: 1.3;
+  }
+  .question .num { color: #764ba2; }
+  .question .pct-mark { color: #b71c1c; }
+
+  .timer { height: 8px; background: #f1edf6; border-radius: 4px; margin: 14px auto; max-width: 360px; overflow: hidden; }
+  .timer-bar {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, #2e8b57, #f6ad0f, #e74c3c);
+    border-radius: 4px;
+    transition: none;
+  }
+  .timer.hidden { visibility: hidden; }
+
+  .answer-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; margin: 10px 0 14px;
+  }
+  input#answer {
+    width: 130px; font-size: 30px; text-align: center;
+    padding: 10px; border: 2px solid #e4dcf0; border-radius: 12px;
+  }
+  .pct-suffix { font-size: 30px; font-weight: 800; color: #b71c1c; }
+  button#submit {
+    display: block; margin: 0 auto;
+    background: #764ba2; color: #fff; border: none;
+    padding: 12px 42px; font-size: 18px; font-weight: 700;
+    border-radius: 12px; cursor: pointer;
+  }
+  button#submit:active { transform: scale(0.97); }
+  .feedback { min-height: 30px; font-size: 17px; font-weight: 800; margin-top: 14px; color: #2e8b57; }
+  .feedback.wrong { color: #c0392b; }
+  .praise { min-height: 24px; font-size: 15px; font-weight: 700; color: #6a4f8c; margin-top: 6px; }
+
+  /* Login overlay (same pattern as the other pages) */
+  .login-overlay {
+    position: fixed; inset: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-overlay.hidden { display: none; }
+  .login-card {
+    background: #fff; border-radius: 16px; padding: 36px 44px;
+    text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    max-width: 360px; width: 90%;
+  }
+  .login-card h2 { color: #4a3568; margin: 0 0 6px; }
+  .login-card p { color: #888; margin: 0 0 18px; font-size: 14px; }
+  .login-card input {
+    width: 100%; font-size: 28px; text-align: center; letter-spacing: 8px;
+    padding: 10px; border: 2px solid #e4dcf0; border-radius: 10px; margin-bottom: 12px;
+  }
+  .login-card button {
+    width: 100%; background: #764ba2; color: #fff; border: none;
+    padding: 12px; font-size: 17px; font-weight: 700; border-radius: 10px; cursor: pointer;
+  }
+  .login-error { color: #c0392b; font-size: 13px; font-weight: 700; min-height: 18px; margin-top: 8px; }
+  @media (max-width: 560px) {
+    .card { padding: 18px; }
+    h1 { font-size: 18px; }
+    .question { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="top-row">
+      <a class="back-link" href="/">⬅️ Math Practice</a>
+      <h1>％ Percent Power</h1>
+      <div class="score-pill">Q <span id="q-num">1</span> / 10</div>
+    </div>
+    <div class="mode-toggle">
+      <button type="button" class="mode-btn active" data-mode="snail">🐌 Snail</button>
+      <button type="button" class="mode-btn dog" data-mode="dog">🐕 Dog (15s)</button>
+      <button type="button" class="mode-btn cheetah" data-mode="cheetah">🐆 Cheetah (5s)</button>
+    </div>
+    <div class="progress-label" id="progress-label">Round 1</div>
+    <div class="progress-bar" id="progress-bar">
+      <div class="progress-cell"></div><div class="progress-cell"></div>
+      <div class="progress-cell"></div><div class="progress-cell"></div>
+      <div class="progress-cell"></div><div class="progress-cell"></div>
+      <div class="progress-cell"></div><div class="progress-cell"></div>
+      <div class="progress-cell"></div><div class="progress-cell"></div>
+    </div>
+    <div class="question" id="question">—</div>
+    <div class="timer hidden" id="timer"><div class="timer-bar" id="timer-bar"></div></div>
+    <div class="answer-row">
+      <input type="number" id="answer" autocomplete="off" inputmode="numeric" />
+      <span class="pct-suffix">%</span>
+    </div>
+    <button id="submit">Submit</button>
+    <div class="feedback" id="feedback"></div>
+    <div class="praise" id="praise"></div>
+  </div>
+
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-card">
+      <h2>％ Percent Power</h2>
+      <p>Type your secret code to play!</p>
+      <input type="password" id="login-pin" inputmode="numeric" autocomplete="off" maxlength="8" />
+      <button id="login-btn">Let's Go! 🚀</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  // ----- Question pool: clean mental-math combos only -----
+  // "What % of X is Y?" where Y = P% of X is always a whole number.
+  const BASES = [10, 20, 25, 40, 50, 60, 80, 100, 150, 200, 250, 300, 400, 500];
+  const PERCENTS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90];
+  const POOL = [];
+  for (const x of BASES) {
+    for (const p of PERCENTS) {
+      if ((x * p) % 100 === 0) POOL.push({ x: x, p: p, y: (x * p) / 100 });
+    }
+  }
+
+  const MODE_SECONDS = { snail: 0, dog: 15, cheetah: 5 };
+  const ROUND_SIZE = 10;
+
+  const qEl = document.getElementById('question');
+  const answerEl = document.getElementById('answer');
+  const submitBtn = document.getElementById('submit');
+  const feedbackEl = document.getElementById('feedback');
+  const praiseEl = document.getElementById('praise');
+  const timerEl = document.getElementById('timer');
+  const timerBarEl = document.getElementById('timer-bar');
+  const qNumEl = document.getElementById('q-num');
+  const progressLabelEl = document.getElementById('progress-label');
+  const cells = Array.prototype.slice.call(document.querySelectorAll('.progress-cell'));
+
+  let mode = 'snail';
+  let userPin = '';
+  let bag = [];                 // shuffled pool indices to draw from
+  let current = null;           // { x, p, y }
+  let secondChance = false;
+  let qIndex = 0;               // 0..9 within the round
+  let roundNum = 1;
+  let roundResults = [];        // 'right' | 'second' | 'missed' per question
+  let timerId = null;
+  let locked = false;           // input locked during transitions
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  function nextFromBag() {
+    if (!bag.length) bag = shuffle(POOL.slice());
+    return bag.pop();
+  }
+
+  // ----- Sounds -----
+  let audioCtx = null;
+  function chime(good) {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const notes = good ? [523.25, 659.25, 783.99] : [220, 174.61];
+      notes.forEach(function (f, i) {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.12, audioCtx.currentTime + i * 0.09);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.09 + 0.25);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(audioCtx.currentTime + i * 0.09);
+        o.stop(audioCtx.currentTime + i * 0.09 + 0.3);
+      });
+    } catch (e) {}
+  }
+  function speak(msg) {
+    try {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(msg);
+      u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.1;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+
+  // ----- Server events (fire-and-forget) -----
+  function postEvent(event) {
+    if (!userPin) return;
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: userPin, event: event })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  // ----- Timer (Dog 15s / Cheetah 5s per chance; Snail untimed) -----
+  function stopTimer() {
+    if (timerId) { clearTimeout(timerId); timerId = null; }
+    timerBarEl.style.transition = 'none';
+    timerBarEl.style.width = '100%';
+  }
+  function startTimer() {
+    stopTimer();
+    const secs = MODE_SECONDS[mode];
+    if (!secs) { timerEl.classList.add('hidden'); return; }
+    timerEl.classList.remove('hidden');
+    // kick the transition on the next frame so the reset above paints first
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        timerBarEl.style.transition = 'width ' + secs + 's linear';
+        timerBarEl.style.width = '0%';
+      });
+    });
+    timerId = setTimeout(handleTimeout, secs * 1000);
+  }
+
+  // ----- Round / question flow -----
+  function renderProgress() {
+    for (let i = 0; i < ROUND_SIZE; i++) {
+      cells[i].className = 'progress-cell' + (roundResults[i] ? ' ' + roundResults[i] : '');
+    }
+    qNumEl.textContent = Math.min(qIndex + 1, ROUND_SIZE);
+    progressLabelEl.textContent = 'Round ' + roundNum;
+  }
+
+  function renderQuestion() {
+    qEl.innerHTML = 'What <span class="pct-mark">%</span> of <span class="num">' + current.x +
+      '</span> is <span class="num">' + current.y + '</span>?';
+  }
+
+  function newQuestion() {
+    current = nextFromBag();
+    secondChance = false;
+    locked = false;
+    answerEl.value = '';
+    answerEl.disabled = false;
+    submitBtn.disabled = false;
+    renderQuestion();
+    renderProgress();
+    feedbackEl.textContent = '';
+    answerEl.focus();
+    startTimer();
+  }
+
+  function newRound() {
+    qIndex = 0;
+    roundResults = [];
+    praiseEl.textContent = '';
+    newQuestion();
+  }
+
+  function advance(result) {
+    roundResults[qIndex] = result;
+    qIndex++;
+    renderProgress();
+    if (qIndex >= ROUND_SIZE) {
+      finishRound();
+    } else {
+      setTimeout(newQuestion, result === 'right' ? 900 : 2300);
+    }
+  }
+
+  function finishRound() {
+    stopTimer();
+    locked = true;
+    answerEl.disabled = true;
+    submitBtn.disabled = true;
+    const first = roundResults.filter(function (r) { return r === 'right'; }).length;
+    const second = roundResults.filter(function (r) { return r === 'second'; }).length;
+    praiseEl.textContent = '🎉 Round ' + roundNum + ' done — ' + first + '/10 on the first try' +
+      (second ? ', ' + second + ' on the second' : '') + '!';
+    speak('Round done! You got ' + first + ' out of ten on the first try.');
+    postEvent({ type: 'percent-round-complete', mode: mode, firstTry: first, round: roundNum });
+    roundNum++;
+    setTimeout(function () {
+      praiseEl.textContent = '';
+      newRound();
+    }, 3500);
+  }
+
+  function miss(kind) {
+    chime(false);
+    if (!secondChance) {
+      secondChance = true;
+      answerEl.value = '';
+      feedbackEl.textContent = (kind === 'timeout' ? '⏰ Time\'s up! ' : '⚠️ Not quite! ') +
+        'STRIKE 1 — one more chance!';
+      feedbackEl.className = 'feedback wrong';
+      postEvent({ type: 'percent-wrong', mode: mode, x: current.x, y: current.y, p: current.p, kind: kind });
+      answerEl.focus();
+      startTimer(); // fresh clock for the second chance
+    } else {
+      stopTimer();
+      locked = true;
+      answerEl.disabled = true;
+      submitBtn.disabled = true;
+      feedbackEl.textContent = '❌ It\'s ' + current.p + '%. ' + current.y + ' is ' +
+        current.p + '% of ' + current.x + '.';
+      feedbackEl.className = 'feedback wrong';
+      postEvent({ type: 'percent-missed', mode: mode, x: current.x, y: current.y, p: current.p });
+      advance('missed');
+    }
+  }
+
+  function handleTimeout() {
+    if (locked) return;
+    miss('timeout');
+  }
+
+  function submit() {
+    if (locked) return;
+    const raw = answerEl.value.trim();
+    if (raw === '') { answerEl.focus(); return; }
+    const guess = parseInt(raw, 10);
+    if (isNaN(guess)) { answerEl.focus(); return; }
+    try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) {}
+    if (guess === current.p) {
+      stopTimer();
+      locked = true;
+      answerEl.disabled = true;
+      submitBtn.disabled = true;
+      const result = secondChance ? 'second' : 'right';
+      feedbackEl.textContent = '✅ Yes! ' + current.y + ' is ' + current.p + '% of ' + current.x + '!';
+      feedbackEl.className = 'feedback';
+      chime(true);
+      postEvent({ type: 'percent-correct', mode: mode, x: current.x, y: current.y, p: current.p, firstTry: !secondChance });
+      advance(result);
+    } else {
+      miss('wrong');
+    }
+  }
+
+  submitBtn.addEventListener('click', submit);
+  answerEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); submit(); }
+  });
+
+  // ----- Mode toggle: switching modes starts a fresh round on that clock -----
+  document.querySelectorAll('.mode-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      mode = b.getAttribute('data-mode');
+      document.querySelectorAll('.mode-btn').forEach(function (x) {
+        x.classList.toggle('active', x === b);
+      });
+      stopTimer();
+      if (MODE_SECONDS[mode]) timerEl.classList.remove('hidden');
+      else timerEl.classList.add('hidden');
+      feedbackEl.textContent = '';
+      roundNum = 1;
+      newRound();
+    });
+  });
+
+  // ----- Login (same PIN + same-tab carry-over as Math and Maps) -----
+  async function tryLogin(pin) {
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = '';
+    if (!pin) { errEl.textContent = 'Type your code first.'; return; }
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pin })
+      });
+      if (res.ok) {
+        userPin = pin;
+        try { sessionStorage.setItem('mp_pin', pin); } catch (e) {}
+        document.getElementById('login-overlay').classList.add('hidden');
+        postEvent({ type: 'percent-session-start' });
+        answerEl.focus();
+      } else if (res.status === 401) {
+        try { sessionStorage.removeItem('mp_pin'); } catch (e) {}
+        errEl.textContent = 'Oops! Wrong code. Try again.';
+        document.getElementById('login-pin').value = '';
+      } else {
+        errEl.textContent = 'Server error. Try again.';
+      }
+    } catch (e) {
+      errEl.textContent = 'Could not connect. Try again later.';
+    }
+  }
+  document.getElementById('login-btn').addEventListener('click', function () {
+    tryLogin(document.getElementById('login-pin').value.trim());
+  });
+  document.getElementById('login-pin').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); tryLogin(document.getElementById('login-pin').value.trim()); }
+  });
+
+  // ----- Boot -----
+  newRound();
+  try {
+    const carriedPin = sessionStorage.getItem('mp_pin');
+    if (carriedPin) tryLogin(carriedPin);
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
